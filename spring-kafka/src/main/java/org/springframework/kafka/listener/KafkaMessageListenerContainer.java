@@ -424,8 +424,6 @@ public class KafkaMessageListenerContainer<K, V> extends AbstractMessageListener
 			Assert.state(!this.isBatchListener || !this.isRecordAck, "Cannot use AckMode.RECORD with a batch listener");
 			if (this.transactionManager != null) {
 				this.transactionTemplate = new TransactionTemplate(this.transactionManager);
-				Assert.state(!(this.errorHandler instanceof RemainingRecordsErrorHandler),
-						"You cannot use a 'RemainingRecordsErrorHandler' with transactions");
 			}
 			else {
 				this.transactionTemplate = null;
