@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
@@ -38,7 +39,6 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mockito;
 
-import org.springframework.beans.DirectFieldAccessor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -57,7 +57,6 @@ import org.springframework.kafka.listener.AbstractMessageListenerContainer.AckMo
 import org.springframework.kafka.listener.ConcurrentMessageListenerContainer;
 import org.springframework.kafka.listener.ConsumerSeekAware;
 import org.springframework.kafka.listener.KafkaListenerErrorHandler;
-import org.springframework.kafka.listener.KafkaMessageListenerContainer;
 import org.springframework.kafka.listener.MessageListenerContainer;
 import org.springframework.kafka.listener.adapter.FilteringAcknowledgingMessageListenerAdapter;
 import org.springframework.kafka.listener.adapter.MessagingMessageListenerAdapter;
@@ -297,28 +296,8 @@ public class EnableKafkaIntegrationTests {
 	}
 
 	@Test
-	@SuppressWarnings("unchecked")
 	public void testBatch() throws Exception {
 		this.recordFilter.called = false;
-		ConcurrentMessageListenerContainer<?, ?> container =
-				(ConcurrentMessageListenerContainer<?, ?>) registry.getListenerContainer("list1");
-		Consumer<?, ?> consumer =
-				spyOnConsumer((KafkaMessageListenerContainer<Integer, String>) container.getContainers().get(0));
-
-		final CountDownLatch commitLatch = new CountDownLatch(2);
-
-		willAnswer(invocation -> {
-
-			try {
-				return invocation.callRealMethod();
-			}
-			finally {
-				commitLatch.countDown();
-			}
-
-		}).given(consumer)
-				.commitSync(any());
-
 		template.send("annotated14", null, "foo");
 		template.send("annotated14", null, "bar");
 		assertThat(this.listener.latch10.await(60, TimeUnit.SECONDS)).isTrue();
@@ -328,7 +307,7 @@ public class EnableKafkaIntegrationTests {
 		assertThat(list.get(0)).isInstanceOf(String.class);
 		assertThat(this.recordFilter.called).isTrue();
 
-		assertThat(commitLatch.await(10, TimeUnit.SECONDS)).isTrue();
+		assertThat(this.config.spyLatch.await(10, TimeUnit.SECONDS)).isTrue();
 	}
 
 	@Test
@@ -404,18 +383,12 @@ public class EnableKafkaIntegrationTests {
 		assertThat(this.listener.ack).isNotNull();
 	}
 
-	private Consumer<?, ?> spyOnConsumer(KafkaMessageListenerContainer<Integer, String> container) {
-		Consumer<?, ?> consumer = spy(
-				KafkaTestUtils.getPropertyValue(container, "listenerConsumer.consumer", Consumer.class));
-		new DirectFieldAccessor(KafkaTestUtils.getPropertyValue(container, "listenerConsumer"))
-				.setPropertyValue("consumer", consumer);
-		return consumer;
-	}
-
 	@Configuration
 	@EnableKafka
 	@EnableTransactionManagement(proxyTargetClass = true)
 	public static class Config {
+
+		private final CountDownLatch spyLatch = new CountDownLatch(2);
 
 		@Bean
 		public static PropertySourcesPlaceholderConfigurer ppc() {
@@ -461,6 +434,34 @@ public class EnableKafkaIntegrationTests {
 			ConcurrentKafkaListenerContainerFactory<Integer, String> factory =
 					new ConcurrentKafkaListenerContainerFactory<>();
 			factory.setConsumerFactory(consumerFactory());
+			factory.setBatchListener(true);
+			factory.setRecordFilterStrategy(recordFilter());
+			return factory;
+		}
+
+		@SuppressWarnings({ "unchecked", "rawtypes" })
+		@Bean
+		public KafkaListenerContainerFactory<?> batchSpyFactory() {
+			ConcurrentKafkaListenerContainerFactory<Integer, String> factory =
+					new ConcurrentKafkaListenerContainerFactory<>();
+			ConsumerFactory spiedCf = mock(ConsumerFactory.class);
+			willAnswer(i -> {
+				Consumer<Integer, String> spy =
+						spy(consumerFactory()
+								.createConsumer(i.getArgumentAt(0, String.class), i.getArgumentAt(1, String.class)));
+				willAnswer(invocation -> {
+
+					try {
+						return invocation.callRealMethod();
+					}
+					finally {
+						spyLatch.countDown();
+					}
+
+				}).given(spy).commitSync(any(Map.class));
+				return spy;
+			}).given(spiedCf).createConsumer(Mockito.anyString(), Mockito.anyString());
+			factory.setConsumerFactory(spiedCf);
 			factory.setBatchListener(true);
 			factory.setRecordFilterStrategy(recordFilter());
 			return factory;
@@ -751,7 +752,9 @@ public class EnableKafkaIntegrationTests {
 			this.latch9.countDown();
 		}
 
-		@KafkaListener(id = "list1", topics = "annotated14", containerFactory = "batchFactory")
+		private final AtomicBoolean reposition10 = new AtomicBoolean();
+
+		@KafkaListener(id = "list1", topics = "annotated14", containerFactory = "batchSpyFactory")
 		public void listen10(List<String> list) {
 			this.payload = list;
 			this.latch10.countDown();
