@@ -223,7 +223,7 @@ public class KafkaAdmin implements ApplicationContextAware, SmartInitializingSin
 				}
 				catch (ExecutionException e) {
 					logger.error("Failed to create topics", e.getCause());
-					throw e.getCause();
+					throw new KafkaException("Failed to create topics", e.getCause());
 				}
 			}
 		}
