@@ -124,7 +124,7 @@ public class KafkaMessageListenerContainerTests {
 
 	private static String topic18 = "testTopic18";
 
-	
+
 	@ClassRule
 	public static KafkaEmbedded embeddedKafka = new KafkaEmbedded(1, true, topic3, topic4, topic5,
 			topic6, topic7, topic8, topic9, topic10, topic11, topic12, topic13, topic14, topic15, topic16, topic17,
@@ -1535,6 +1535,7 @@ public class KafkaMessageListenerContainerTests {
 		consumer.close();
 		logger.info("Stop rebalance after failed record");
 	}
+
 	private Consumer<?, ?> spyOnConsumer(KafkaMessageListenerContainer<Integer, String> container) {
 		Consumer<?, ?> consumer = spy(
 				KafkaTestUtils.getPropertyValue(container, "listenerConsumer.consumer", Consumer.class));
