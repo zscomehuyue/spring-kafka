@@ -96,9 +96,9 @@ public class KafkaMessageListenerContainer<K, V> extends AbstractMessageListener
 
 	private final TopicPartitionInitialOffset[] topicPartitions;
 
-	private ListenerConsumer listenerConsumer;
+	private volatile ListenerConsumer listenerConsumer;
 
-	private ListenableFuture<?> listenerConsumerFuture;
+	private volatile ListenableFuture<?> listenerConsumerFuture;
 
 	private GenericMessageListener<?> listener;
 
@@ -151,11 +151,17 @@ public class KafkaMessageListenerContainer<K, V> extends AbstractMessageListener
 	 * either explicitly or by Kafka; may be null if not assigned yet.
 	 */
 	public Collection<TopicPartition> getAssignedPartitions() {
-		if (this.listenerConsumer.definedPartitions != null) {
-			return Collections.unmodifiableCollection(this.listenerConsumer.definedPartitions.keySet());
-		}
-		else if (this.listenerConsumer.assignedPartitions != null) {
-			return Collections.unmodifiableCollection(this.listenerConsumer.assignedPartitions);
+		ListenerConsumer listenerConsumer = this.listenerConsumer;
+		if (listenerConsumer != null) {
+			if (listenerConsumer.definedPartitions != null) {
+				return Collections.unmodifiableCollection(listenerConsumer.definedPartitions.keySet());
+			}
+			else if (listenerConsumer.assignedPartitions != null) {
+				return Collections.unmodifiableCollection(listenerConsumer.assignedPartitions);
+			}
+			else {
+				return null;
+			}
 		}
 		else {
 			return null;
@@ -265,7 +271,8 @@ public class KafkaMessageListenerContainer<K, V> extends AbstractMessageListener
 	public String toString() {
 		return "KafkaMessageListenerContainer [id=" + getBeanName()
 				+ (this.clientIdSuffix != null ? ", clientIndex=" + this.clientIdSuffix : "")
-				+ ", topicPartitions=" + getAssignedPartitions()
+				+ ", topicPartitions="
+				+ (getAssignedPartitions() == null ? "none assigned" : getAssignedPartitions())
 				+ "]";
 	}
 
