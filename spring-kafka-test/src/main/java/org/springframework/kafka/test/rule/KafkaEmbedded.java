@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2017 the original author or authors.
+ * Copyright 2015-2018 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -82,6 +82,7 @@ import scala.collection.Set;
  * @author Artem Bilan
  * @author Gary Russell
  * @author Kamill Sokol
+ * @author Elliot Kennedy
  */
 public class KafkaEmbedded extends ExternalResource implements KafkaRule, InitializingBean, DisposableBean {
 
@@ -474,23 +475,7 @@ public class KafkaEmbedded extends ExternalResource implements KafkaRule, Initia
 	 * @throws Exception an exception.
 	 */
 	public void consumeFromAllEmbeddedTopics(Consumer<?, ?> consumer) throws Exception {
-		final CountDownLatch consumerLatch = new CountDownLatch(1);
-		consumer.subscribe(Arrays.asList(this.topics), new ConsumerRebalanceListener() {
-
-			@Override
-			public void onPartitionsRevoked(Collection<TopicPartition> partitions) {
-			}
-
-			@Override
-			public void onPartitionsAssigned(Collection<TopicPartition> partitions) {
-				consumerLatch.countDown();
-			}
-
-		});
-		consumer.poll(0); // force assignment
-		assertThat(consumerLatch.await(30, TimeUnit.SECONDS))
-				.as("Failed to be assigned partitions from the embedded topics")
-				.isTrue();
+		consumeFromEmbeddedTopics(consumer, this.topics);
 	}
 
 	/**
@@ -513,6 +498,7 @@ public class KafkaEmbedded extends ExternalResource implements KafkaRule, Initia
 		for (String topic : topics) {
 			assertThat(this.topics).as("topic '" + topic + "' is not in embedded topic list").contains(topic);
 		}
+		final CountDownLatch consumerLatch = new CountDownLatch(1);
 		consumer.subscribe(Arrays.asList(topics), new ConsumerRebalanceListener() {
 
 			@Override
@@ -521,12 +507,17 @@ public class KafkaEmbedded extends ExternalResource implements KafkaRule, Initia
 
 			@Override
 			public void onPartitionsAssigned(Collection<TopicPartition> partitions) {
+				consumerLatch.countDown();
 				if (logger.isDebugEnabled()) {
 					logger.debug("partitions assigned: " + partitions);
 				}
 			}
 
 		});
+		consumer.poll(0); // force assignment
+		assertThat(consumerLatch.await(30, TimeUnit.SECONDS))
+				.as("Failed to be assigned partitions from the embedded topics")
+				.isTrue();
 		logger.debug("Subscription Initiated");
 	}
 
