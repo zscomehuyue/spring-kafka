@@ -492,9 +492,6 @@ public class KafkaEmbedded extends ExternalResource implements KafkaRule, Initia
 			@Override
 			public void onPartitionsAssigned(Collection<TopicPartition> partitions) {
 				consumerLatch.countDown();
-				if (logger.isDebugEnabled()) {
-					logger.debug("partitions assigned: " + partitions);
-				}
 			}
 
 		});
@@ -502,7 +499,6 @@ public class KafkaEmbedded extends ExternalResource implements KafkaRule, Initia
 		assertThat(consumerLatch.await(30, TimeUnit.SECONDS))
 				.as("Failed to be assigned partitions from the embedded topics")
 				.isTrue();
-		logger.debug("Subscription Initiated");
 	}
 
 }
