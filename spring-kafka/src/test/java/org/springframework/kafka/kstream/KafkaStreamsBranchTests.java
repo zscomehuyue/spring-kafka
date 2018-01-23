@@ -29,11 +29,9 @@ import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.common.serialization.StringDeserializer;
-import org.apache.kafka.streams.Consumed;
-import org.apache.kafka.streams.StreamsBuilder;
 import org.apache.kafka.streams.StreamsConfig;
 import org.apache.kafka.streams.kstream.KStream;
-import org.apache.kafka.streams.kstream.Produced;
+import org.apache.kafka.streams.kstream.KStreamBuilder;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
@@ -150,16 +148,16 @@ public class KafkaStreamsBranchTests {
 
 		@Bean
 		@SuppressWarnings("unchecked")
-		public KStream<String, String> trueFalseStream(StreamsBuilder streamsBuilder) {
+		public KStream<String, String> trueFalseStream(KStreamBuilder streamsBuilder) {
 			KStream<String, String> trueFalseStream = streamsBuilder
-					.stream(TRUE_FALSE_INPUT_TOPIC, Consumed.with(Serdes.String(), Serdes.String()));
+					.stream(Serdes.String(), Serdes.String(), TRUE_FALSE_INPUT_TOPIC);
 
 			KStream<String, String>[] branches =
 					trueFalseStream.branch((key, value) -> String.valueOf(true).equals(value),
 							(key, value) -> String.valueOf(false).equals(value));
 
-			branches[0].to(TRUE_TOPIC, Produced.with(Serdes.String(), Serdes.String()));
-			branches[1].to(FALSE_TOPIC, Produced.with(Serdes.String(), Serdes.String()));
+			branches[0].to(Serdes.String(), Serdes.String(), TRUE_TOPIC);
+			branches[1].to(Serdes.String(), Serdes.String(), FALSE_TOPIC);
 
 			return trueFalseStream;
 		}
