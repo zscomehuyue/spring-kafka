@@ -19,6 +19,7 @@ package org.springframework.kafka.listener;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willAnswer;
@@ -549,7 +550,7 @@ public class KafkaMessageListenerContainerTests {
 	private void testRecordAckMockForeignThreadGuts(AckMode ackMode) throws Exception {
 		ConsumerFactory<Integer, String> cf = mock(ConsumerFactory.class);
 		Consumer<Integer, String> consumer = mock(Consumer.class);
-		given(cf.createConsumer(isNull(), eq("clientId"), isNull())).willReturn(consumer);
+		given(cf.createConsumer(isNull(), eq("clientId"))).willReturn(consumer);
 		final Map<TopicPartition, List<ConsumerRecord<Integer, String>>> records = new HashMap<>();
 		records.put(new TopicPartition("foo", 0), Arrays.asList(
 				new ConsumerRecord<>("foo", 0, 0L, 1, "foo"),
@@ -591,9 +592,9 @@ public class KafkaMessageListenerContainerTests {
 		).given(consumer).commitSync(any(Map.class));
 
 		containerProps.setMessageListener(messageListener);
-		containerProps.setClientId("clientId");
 		KafkaMessageListenerContainer<Integer, String> container =
 				new KafkaMessageListenerContainer<>(cf, containerProps);
+		container.setClientIdSuffix("clientId");
 		container.start();
 		assertThat(latch.await(10, TimeUnit.SECONDS)).isTrue();
 		acks.get(1).acknowledge();
