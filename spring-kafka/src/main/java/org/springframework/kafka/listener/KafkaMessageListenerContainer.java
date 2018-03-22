@@ -48,6 +48,7 @@ import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.errors.WakeupException;
 
 import org.springframework.core.task.SimpleAsyncTaskExecutor;
+import org.springframework.kafka.KafkaException;
 import org.springframework.kafka.core.ConsumerFactory;
 import org.springframework.kafka.core.KafkaResourceHolder;
 import org.springframework.kafka.core.ProducerFactoryUtils;
@@ -293,7 +294,7 @@ public class KafkaMessageListenerContainer<K, V> extends AbstractMessageListener
 
 		private final Consumer<K, V> consumer;
 
-		private final Map<String, Map<Integer, Long>> offsets = new HashMap<>();
+		private final Map<String, Map<Integer, Long>> offsets = new HashMap<String, Map<Integer, Long>>();
 
 		private final MessageListener<K, V> listener;
 
@@ -347,6 +348,8 @@ public class KafkaMessageListenerContainer<K, V> extends AbstractMessageListener
 		private volatile Map<TopicPartition, OffsetMetadata> definedPartitions;
 
 		private volatile Collection<TopicPartition> assignedPartitions;
+
+		private volatile Thread consumerThread;
 
 		private int count;
 
@@ -600,6 +603,7 @@ public class KafkaMessageListenerContainer<K, V> extends AbstractMessageListener
 
 		@Override
 		public void run() {
+			this.consumerThread = Thread.currentThread();
 			if (this.theListener instanceof ConsumerSeekAware) {
 				((ConsumerSeekAware) this.theListener).registerSeekCallback(this);
 			}
@@ -709,16 +713,27 @@ public class KafkaMessageListenerContainer<K, V> extends AbstractMessageListener
 		}
 
 		private void processAck(ConsumerRecord<K, V> record) {
-			if (this.isManualImmediateAck) {
+			if (!Thread.currentThread().equals(this.consumerThread)) {
 				try {
-					ackImmediate(record);
+					this.acks.put(record);
 				}
-				catch (WakeupException e) {
-					// ignore - not polling
+				catch (InterruptedException e) {
+					Thread.currentThread().interrupt();
+					throw new KafkaException("Interrupted while storing ack", e);
 				}
 			}
 			else {
-				addOffset(record);
+				if (this.isManualImmediateAck) {
+					try {
+						ackImmediate(record);
+					}
+					catch (WakeupException e) {
+						// ignore - not polling
+					}
+				}
+				else {
+					addOffset(record);
+				}
 			}
 		}
 

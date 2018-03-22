@@ -22,6 +22,7 @@ import static org.mockito.BDDMockito.willAnswer;
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.anyLong;
 import static org.mockito.Matchers.anyString;
+import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
@@ -306,6 +307,77 @@ public class KafkaMessageListenerContainerTests {
 		inOrder.verify(messageListener).onMessage(any(ConsumerRecord.class));
 		inOrder.verify(consumer).commitSync(any(Map.class));
 		container.stop();
+	}
+
+	@Test
+	public void testRecordAckMockForeignThread() throws Exception {
+		testRecordAckMockForeignThreadGuts(AckMode.MANUAL);
+	}
+
+	@Test
+	public void testRecordAckMockForeignThreadImmediate() throws Exception {
+		testRecordAckMockForeignThreadGuts(AckMode.MANUAL_IMMEDIATE);
+	}
+
+	@SuppressWarnings("unchecked")
+	private void testRecordAckMockForeignThreadGuts(AckMode ackMode) throws Exception {
+		ConsumerFactory<Integer, String> cf = mock(ConsumerFactory.class);
+		Consumer<Integer, String> consumer = mock(Consumer.class);
+		given(cf.createConsumer(anyString(), eq("clientId"))).willReturn(consumer);
+		final Map<TopicPartition, List<ConsumerRecord<Integer, String>>> records = new HashMap<>();
+		records.put(new TopicPartition("foo", 0), Arrays.asList(
+				new ConsumerRecord<>("foo", 0, 0L, 1, "foo"),
+				new ConsumerRecord<>("foo", 0, 1L, 1, "bar")));
+		ConsumerRecords<Integer, String> consumerRecords = new ConsumerRecords<>(records);
+		given(consumer.poll(anyLong())).willAnswer(i -> {
+			Thread.sleep(50);
+			return consumerRecords;
+		});
+		TopicPartitionInitialOffset[] topicPartition = new TopicPartitionInitialOffset[] {
+				new TopicPartitionInitialOffset("foo", 0) };
+		ContainerProperties containerProps = new ContainerProperties(topicPartition);
+		containerProps.setAckMode(ackMode);
+		final CountDownLatch latch = new CountDownLatch(2);
+		final List<Acknowledgment> acks = new ArrayList<>();
+		final AtomicReference<Thread> consumerThread = new AtomicReference<>();
+		AcknowledgingMessageListener<Integer, String> messageListener = spy(
+				new AcknowledgingMessageListener<Integer, String>() {
+
+					@Override
+					public void onMessage(ConsumerRecord<Integer, String> data, Acknowledgment acknowledgment) {
+						acks.add(acknowledgment);
+						consumerThread.set(Thread.currentThread());
+						latch.countDown();
+						if (latch.getCount() == 0) {
+							records.clear();
+						}
+					}
+
+				});
+
+		final CountDownLatch commitLatch = new CountDownLatch(1);
+		final AtomicReference<Thread> commitThread = new AtomicReference<>();
+		willAnswer(i -> {
+					commitThread.set(Thread.currentThread());
+					commitLatch.countDown();
+					return null;
+				}
+		).given(consumer).commitSync(any(Map.class));
+
+		containerProps.setMessageListener(messageListener);
+		KafkaMessageListenerContainer<Integer, String> container =
+				new KafkaMessageListenerContainer<>(cf, containerProps);
+		container.setClientIdSuffix("clientId");
+		container.start();
+		assertThat(latch.await(10, TimeUnit.SECONDS)).isTrue();
+		acks.get(1).acknowledge();
+		assertThat(commitLatch.await(10, TimeUnit.SECONDS)).isTrue();
+		InOrder inOrder = inOrder(messageListener, consumer);
+		inOrder.verify(consumer).poll(1000);
+		inOrder.verify(messageListener, times(2)).onMessage(any(ConsumerRecord.class), any(Acknowledgment.class));
+		inOrder.verify(consumer).commitSync(any(Map.class));
+		container.stop();
+		assertThat(commitThread.get()).isSameAs(consumerThread.get());
 	}
 
 	@SuppressWarnings("unchecked")
