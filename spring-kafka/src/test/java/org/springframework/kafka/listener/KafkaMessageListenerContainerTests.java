@@ -1402,7 +1402,7 @@ public class KafkaMessageListenerContainerTests {
 	public void testAckModeCount() throws Exception {
 		ConsumerFactory<Integer, String> cf = mock(ConsumerFactory.class);
 		Consumer<Integer, String> consumer = mock(Consumer.class);
-		given(cf.createConsumer(isNull(), eq("clientId"))).willReturn(consumer);
+		given(cf.createConsumer(anyString(), eq("clientId"))).willReturn(consumer);
 		TopicPartition topicPartition = new TopicPartition("foo", 0);
 		final Map<TopicPartition, List<ConsumerRecord<Integer, String>>> records1 = new HashMap<>();
 		records1.put(topicPartition, Arrays.asList(
