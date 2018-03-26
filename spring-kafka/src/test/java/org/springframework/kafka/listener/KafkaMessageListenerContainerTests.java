@@ -33,6 +33,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.BitSet;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -1612,7 +1613,7 @@ public class KafkaMessageListenerContainerTests {
 	public void testAckModeCount() throws Exception {
 		ConsumerFactory<Integer, String> cf = mock(ConsumerFactory.class);
 		Consumer<Integer, String> consumer = mock(Consumer.class);
-		given(cf.createConsumer(isNull(), eq("clientId"), isNull())).willReturn(consumer);
+		given(cf.createConsumer(isNull(), eq("clientId"))).willReturn(consumer);
 		TopicPartition topicPartition = new TopicPartition("foo", 0);
 		final Map<TopicPartition, List<ConsumerRecord<Integer, String>>> records1 = new HashMap<>();
 		records1.put(topicPartition, Arrays.asList(
@@ -1657,13 +1658,13 @@ public class KafkaMessageListenerContainerTests {
 		ContainerProperties containerProps = new ContainerProperties(topicPartitionOffset);
 		containerProps.setAckMode(AckMode.COUNT);
 		containerProps.setAckCount(3);
-		containerProps.setClientId("clientId");
 		AtomicInteger recordCount = new AtomicInteger();
 		containerProps.setMessageListener((MessageListener) r -> {
 			recordCount.incrementAndGet();
 		});
 		KafkaMessageListenerContainer<Integer, String> container =
 				new KafkaMessageListenerContainer<>(cf, containerProps);
+		container.setClientIdSuffix("clientId");
 		container.start();
 		assertThat(commitLatch.await(10, TimeUnit.SECONDS)).isTrue();
 		assertThat(recordCount.get()).isEqualTo(7);
