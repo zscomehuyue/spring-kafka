@@ -435,7 +435,7 @@ public class KafkaMessageListenerContainerTests {
 	public void testNonResponsiveConsumerEventNotIssuedWithActiveConsumer() throws Exception {
 		ConsumerFactory<Integer, String> cf = mock(ConsumerFactory.class);
 		Consumer<Integer, String> consumer = mock(Consumer.class);
-		given(cf.createConsumer(anyString(), eq(""))).willReturn(consumer);
+		given(cf.createConsumer(anyString(), anyString())).willReturn(consumer);
 		ConsumerRecords records = new ConsumerRecords(Collections.emptyMap());
 		CountDownLatch latch = new CountDownLatch(20);
 		given(consumer.poll(anyLong())).willAnswer(i -> {
