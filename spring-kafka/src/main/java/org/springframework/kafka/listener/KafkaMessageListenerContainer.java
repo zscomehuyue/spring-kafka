@@ -357,6 +357,8 @@ public class KafkaMessageListenerContainer<K, V> extends AbstractMessageListener
 
 		private boolean taskSchedulerExplicitlySet;
 
+		private volatile long lastPoll = System.currentTimeMillis();
+
 		@SuppressWarnings("unchecked")
 		ListenerConsumer(GenericMessageListener<?> listener, ListenerType listenerType) {
 			Assert.state(!this.isAnyManualAck || !this.autoCommit,
@@ -437,7 +439,7 @@ public class KafkaMessageListenerContainer<K, V> extends AbstractMessageListener
 		}
 
 		protected void checkConsumer() {
-			long timeSinceLastPoll = System.currentTimeMillis() - last;
+			long timeSinceLastPoll = System.currentTimeMillis() - this.lastPoll;
 			if (((float) timeSinceLastPoll) / (float) this.containerProperties.getPollTimeout()
 					> this.containerProperties.getNoPollThreshold()) {
 				publishNonResponsiveConsumerEvent(timeSinceLastPoll, this.consumer);
@@ -619,6 +621,8 @@ public class KafkaMessageListenerContainer<K, V> extends AbstractMessageListener
 					}
 					processSeeks();
 					ConsumerRecords<K, V> records = this.consumer.poll(this.containerProperties.getPollTimeout());
+					this.lastPoll = System.currentTimeMillis();
+
 					if (records != null && this.logger.isDebugEnabled()) {
 						this.logger.debug("Received: " + records.count() + " records");
 					}
