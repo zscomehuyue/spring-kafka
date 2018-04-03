@@ -1,5 +1,5 @@
 /*
- * Copyright 2016-2017 the original author or authors.
+ * Copyright 2016-2018 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -428,6 +428,50 @@ public class KafkaMessageListenerContainerTests {
 		container.start();
 		assertThat(latch.await(10, TimeUnit.SECONDS)).isTrue();
 		container.stop();
+	}
+
+	@SuppressWarnings({ "unchecked", "rawtypes" })
+	@Test
+	public void testNonResponsiveConsumerEventNotIssuedWithActiveConsumer() throws Exception {
+		ConsumerFactory<Integer, String> cf = mock(ConsumerFactory.class);
+		Consumer<Integer, String> consumer = mock(Consumer.class);
+		given(cf.createConsumer(anyString(), eq(""))).willReturn(consumer);
+		ConsumerRecords records = new ConsumerRecords(Collections.emptyMap());
+		CountDownLatch latch = new CountDownLatch(20);
+		given(consumer.poll(anyLong())).willAnswer(i -> {
+			Thread.sleep(100);
+			latch.countDown();
+			return records;
+		});
+		TopicPartitionInitialOffset[] topicPartition = new TopicPartitionInitialOffset[] {
+				new TopicPartitionInitialOffset("foo", 0) };
+		ContainerProperties containerProps = new ContainerProperties(topicPartition);
+		containerProps.setNoPollThreshold(2.0f);
+		containerProps.setPollTimeout(100);
+		containerProps.setMonitorInterval(1);
+		containerProps.setMessageListener(mock(MessageListener.class));
+		KafkaMessageListenerContainer<Integer, String> container =
+				new KafkaMessageListenerContainer<>(cf, containerProps);
+		final AtomicInteger eventCounter = new AtomicInteger();
+		container.setApplicationEventPublisher(new ApplicationEventPublisher() {
+
+			@Override
+			public void publishEvent(Object e) {
+				if (e instanceof NonResponsiveConsumerEvent) {
+					eventCounter.incrementAndGet();
+				}
+			}
+
+			@Override
+			public void publishEvent(ApplicationEvent event) {
+				publishEvent((Object) event);
+			}
+
+		});
+		container.start();
+		assertThat(latch.await(10, TimeUnit.SECONDS)).isTrue();
+		container.stop();
+		assertThat(eventCounter.get()).isEqualTo(0);
 	}
 
 	@Test
