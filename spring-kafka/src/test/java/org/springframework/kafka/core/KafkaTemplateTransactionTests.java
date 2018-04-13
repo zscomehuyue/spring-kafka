@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 the original author or authors.
+ * Copyright 2017-2018 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@
 package org.springframework.kafka.core;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.eq;
@@ -77,7 +78,7 @@ public class KafkaTemplateTransactionTests {
 		DefaultKafkaProducerFactory<String, String> pf = new DefaultKafkaProducerFactory<>(senderProps);
 		pf.setKeySerializer(new StringSerializer());
 		pf.setTransactionIdPrefix("my.transaction.");
-		KafkaTemplate<String, String> template = new KafkaTemplate<>(pf, true);
+		KafkaTemplate<String, String> template = new KafkaTemplate<>(pf);
 		template.setDefaultTopic(STRING_KEY_TOPIC);
 		Map<String, Object> consumerProps = KafkaTestUtils.consumerProps("testTxString", "false", embeddedKafka);
 		consumerProps.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
@@ -113,7 +114,7 @@ public class KafkaTemplateTransactionTests {
 		DefaultKafkaProducerFactory<String, String> pf = new DefaultKafkaProducerFactory<>(senderProps);
 		pf.setKeySerializer(new StringSerializer());
 		pf.setTransactionIdPrefix("my.transaction.");
-		KafkaTemplate<String, String> template = new KafkaTemplate<>(pf, true);
+		KafkaTemplate<String, String> template = new KafkaTemplate<>(pf);
 		template.setDefaultTopic(STRING_KEY_TOPIC);
 		Map<String, Object> consumerProps = KafkaTestUtils.consumerProps("testTxString", "false", embeddedKafka);
 		consumerProps.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
@@ -163,6 +164,20 @@ public class KafkaTemplateTransactionTests {
 		inOrder.verify(producer2).commitTransaction();
 		inOrder.verify(producer1).commitTransaction();
 		ctx.close();
+	}
+
+	@Test
+	public void testNoTx() {
+		Map<String, Object> senderProps = KafkaTestUtils.producerProps(embeddedKafka);
+		senderProps.put(ProducerConfig.RETRIES_CONFIG, 1);
+		DefaultKafkaProducerFactory<String, String> pf = new DefaultKafkaProducerFactory<>(senderProps);
+		pf.setKeySerializer(new StringSerializer());
+		pf.setTransactionIdPrefix("my.transaction.");
+		KafkaTemplate<String, String> template = new KafkaTemplate<>(pf);
+		template.setDefaultTopic(STRING_KEY_TOPIC);
+		assertThatThrownBy(() -> template.send("foo", "bar"))
+				.isInstanceOf(IllegalStateException.class)
+				.hasMessageContaining("No transaction is in process;");
 	}
 
 	@Configuration
