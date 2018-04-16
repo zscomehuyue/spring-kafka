@@ -130,9 +130,8 @@ public class ConcurrentMessageListenerContainer<K, V> extends AbstractMessageLis
 					container = new KafkaMessageListenerContainer<>(this.consumerFactory, containerProperties,
 							partitionSubset(containerProperties, i));
 				}
-				if (getBeanName() != null) {
-					container.setBeanName(getBeanName() + "-" + i);
-				}
+				String beanName = getBeanName();
+				container.setBeanName((beanName != null ? beanName : "consumer") + "-" + i);
 				if (getApplicationEventPublisher() != null) {
 					container.setApplicationEventPublisher(getApplicationEventPublisher());
 				}
