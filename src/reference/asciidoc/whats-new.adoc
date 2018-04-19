@@ -52,7 +52,12 @@ See <<replying-template>> for more information.
 
 ==== ChainedKafkaTransactionManager
 
-_version 2.1.3_ introduced the `ChainedKafkaTransactionManager` see <<chained-transaction-manager>> for more information.
+_Version 2.1.3_ introduced the `ChainedKafkaTransactionManager` see <<chained-transaction-manager>> for more information.
+
+==== After rollback processing
+
+Starting with _version 2.1.6_, a new `AfterRollbackProcessor` strategy is provided - see <<after-rollback>> for more information.
+
 
 ==== Migration Guide from 2.0
 
