@@ -186,7 +186,7 @@ public class TransactionalContainerTests {
 			return null;
 		}).given(consumer).seek(any(), anyLong());
 		ConsumerFactory cf = mock(ConsumerFactory.class);
-		willReturn(consumer).given(cf).createConsumer("group", "");
+		willReturn(consumer).given(cf).createConsumer("group", null);
 		Producer producer = mock(Producer.class);
 		final CountDownLatch closeLatch = new CountDownLatch(1);
 		willAnswer(i -> {
