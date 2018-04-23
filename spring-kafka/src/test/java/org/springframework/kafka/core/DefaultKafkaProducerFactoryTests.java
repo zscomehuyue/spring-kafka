@@ -28,7 +28,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.kafka.clients.producer.Producer;
 import org.apache.kafka.common.KafkaException;
-import org.junit.jupiter.api.Test;
+import org.junit.Test;
 import org.mockito.InOrder;
 
 import org.springframework.kafka.test.utils.KafkaTestUtils;
