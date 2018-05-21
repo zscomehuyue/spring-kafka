@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 the original author or authors.
+ * Copyright 2017-2018 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -63,7 +63,6 @@ import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
 import org.springframework.kafka.core.DefaultKafkaProducerFactory;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.core.ProducerFactory;
-import org.springframework.kafka.listener.AbstractMessageListenerContainer.AckMode;
 import org.springframework.kafka.listener.config.ContainerProperties;
 import org.springframework.kafka.support.TopicPartitionInitialOffset;
 import org.springframework.kafka.test.rule.KafkaEmbedded;
@@ -93,17 +92,22 @@ public class TransactionalContainerTests {
 	public static KafkaEmbedded embeddedKafka = new KafkaEmbedded(3, true, topic1, topic2);
 
 	@Test
-	public void testConsumeAndProduceTransactionBatch() throws Exception {
-		testConsumeAndProduceTransactionGuts(AckMode.BATCH);
+	public void testConsumeAndProduceTransactionKTM() throws Exception {
+		testConsumeAndProduceTransactionGuts(false, false);
 	}
 
 	@Test
-	public void testConsumeAndProduceTransactionRecord() throws Exception {
-		testConsumeAndProduceTransactionGuts(AckMode.RECORD);
+	public void testConsumeAndProduceTransactionKCTM() throws Exception {
+		testConsumeAndProduceTransactionGuts(true, false);
+	}
+
+	@Test
+	public void testConsumeAndProduceTransactionHandleError() throws Exception {
+		testConsumeAndProduceTransactionGuts(false, true);
 	}
 
 	@SuppressWarnings({ "rawtypes", "unchecked" })
-	private void testConsumeAndProduceTransactionGuts(AckMode ackMode) throws Exception {
+	private void testConsumeAndProduceTransactionGuts(boolean chained, boolean handleError) throws Exception {
 		Consumer consumer = mock(Consumer.class);
 		final TopicPartition topicPartition = new TopicPartition("foo", 0);
 		willAnswer(i -> {
@@ -141,8 +145,13 @@ public class TransactionalContainerTests {
 		final KafkaTemplate template = new KafkaTemplate(pf);
 		props.setMessageListener((MessageListener) m -> {
 			template.send("bar", "baz");
+			if (handleError) {
+				throw new RuntimeException("fail");
+			}
 		});
-		props.setAckMode(ackMode);
+		if (handleError) {
+			props.setErrorHandler((e, data) -> { });
+		}
 		KafkaMessageListenerContainer container = new KafkaMessageListenerContainer<>(cf, props);
 		container.setBeanName("commit");
 		container.start();
