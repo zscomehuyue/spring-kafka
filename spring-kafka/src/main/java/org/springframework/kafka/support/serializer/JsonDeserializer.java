@@ -77,6 +77,9 @@ public class JsonDeserializer<T> implements Deserializer<T> {
 	}
 
 	public T deserialize(String topic, byte[] data) {
+		if (data == null) {
+			return null;
+		}
 		if (this.reader == null) {
 			this.reader = this.objectMapper.readerFor(this.targetType);
 		}
