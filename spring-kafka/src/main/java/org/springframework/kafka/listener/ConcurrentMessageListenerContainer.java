@@ -136,6 +136,7 @@ public class ConcurrentMessageListenerContainer<K, V> extends AbstractMessageLis
 					container.setApplicationEventPublisher(getApplicationEventPublisher());
 				}
 				container.setClientIdSuffix("-" + i);
+				container.setAfterRollbackProcessor(getAfterRollbackProcessor());
 				container.start();
 				this.containers.add(container);
 			}
