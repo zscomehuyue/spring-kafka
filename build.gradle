@@ -78,13 +78,13 @@ subprojects { subproject ->
 		junitJupiterVersion = '5.1.0'
 		junitPlatformVersion = '1.1.0'
 		junitVintageVersion = '5.1.0'
-		kafkaVersion = '1.0.1'
+		kafkaVersion = '1.0.2'
 		mockitoVersion = '2.15.0'
 		scalaVersion = '2.11'
 		slf4jVersion = '1.7.25'
 		springRetryVersion = '1.2.2.RELEASE'
-		springVersion = '5.0.6.RELEASE'
-		springDataCommonsVersion = '2.0.4.RELEASE'
+		springVersion = '5.0.8.RELEASE'
+		springDataCommonsVersion = '2.0.8.RELEASE'
 
 		idPrefix = 'kafka'
 
