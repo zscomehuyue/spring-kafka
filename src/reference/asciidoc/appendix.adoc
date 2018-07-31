@@ -29,6 +29,7 @@ When using `spring-kafka-test` (_version 1.3.x_, starting with _version 1.3.5_) 
     <artifactId>kafka-clients</artifactId>
     <version>1.0.1</version>
     <classifier>test</classifier>
+    <scope>test</scope>
 </dependency>
 
 <dependency>
@@ -47,7 +48,8 @@ When using `spring-kafka-test` (_version 1.3.x_, starting with _version 1.3.5_) 
 </dependency>
 ----
 
+[appendix]
 [[history]]
 == Change History
 
-include::./changes-1.0-1.1.adoc[]
+include::./changes-since-1.0.adoc[]

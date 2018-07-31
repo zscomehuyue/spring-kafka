@@ -1140,7 +1140,7 @@ static class MultiListenerBean {
 ----
 
 [[annotation-error-handling]]
-====== Handling Exceptions
+===== Handling Exceptions
 
 By default, if an annotated listener method throws an exception, it is thrown to the container, and the message will handled according to the container configuration.
 Nothing is returned to the sender.

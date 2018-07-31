@@ -53,6 +53,8 @@ Spring and Apache Kafka.
 - https://github.com/spring-projects/spring-kafka[Spring for Apache Kafka GitHub Repository]
 - https://github.com/spring-projects/spring-integration-kafka[Spring Integration Kafka Extension GitHub Repository]
 
+[[appendices]]
+= Appendices
 
 [appendix]
 include::appendix.adoc[]
