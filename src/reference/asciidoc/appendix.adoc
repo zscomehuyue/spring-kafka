@@ -50,7 +50,7 @@ When using `spring-kafka-test` (version 2.1.x, starting with version 2.1.5) with
 Starting with version 2.1.9, the 2.0.0 `kafka-clients` jar can be used with similar overrides to those described above.
 
 IMPORTANT: When using the 2.0.0 clients with `spring-kafka` 2.1.x, the framework will continue to use the blocking `poll(long)` method to fetch records (future releases will use the `poll(Duration)` method).
-Other previously blocking consumer APIs will timeout according to the `ConsumerConfig.DEFAULT_API_TIMEOUT_MS_CONFIG` (`default.api.timeout.ms`) property; refer to the https://kafka.apache.org/documentation/#upgrade_200_notable[Notable Changes in 2.0.0] section in the Kafka documentation for more information.
+Other previously blocking consumer APIs will time out according to the `ConsumerConfig.DEFAULT_API_TIMEOUT_MS_CONFIG` (`default.api.timeout.ms`) property; refer to the https://kafka.apache.org/documentation/#upgrade_200_notable[Notable Changes in 2.0.0] section in the Kafka documentation for more information.
 
 [appendix]
 [[history]]
