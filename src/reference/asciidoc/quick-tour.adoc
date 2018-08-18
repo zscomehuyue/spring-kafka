@@ -28,9 +28,11 @@ compile 'org.springframework.kafka:spring-kafka:{spring-kafka-version}'
 [[compatibility]]
 ===== Compatibility
 
-- Apache Kafka Clients 1.0.0
+- Apache Kafka Clients 1.0.x or later (See note below)
 - Spring Framework 5.0.x
 - Minimum Java version: 8
+
+NOTE: The framework has been tested with `kafka-clients` 1.1.1 and 2.0.0; when using the `spring-kafka-test` embedded Kafka broker, you must override other jars, as described in <<deps-for-11x>>.
 
 ===== Very, Very Quick
 

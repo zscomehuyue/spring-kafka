@@ -1,7 +1,7 @@
 [[deps-for-11x]]
-== Override Dependencies to use the 1.1.x kafka-clients
+== Override Dependencies to use the 1.1.x/2.0.x kafka-clients with an Embedded Broker
 
-When using `spring-kafka-test` (_version 2.1.x_, starting with _version 2.1.5_) with the 1.1.x `kafka-clients` jar, you will need to override certain transitive dependencies as follows:
+When using `spring-kafka-test` (version 2.1.x, starting with version 2.1.5) with the 1.1.x `kafka-clients` jar, you will need to override certain transitive dependencies as follows:
 
 [source, xml]
 ----
@@ -21,32 +21,35 @@ When using `spring-kafka-test` (_version 2.1.x_, starting with _version 2.1.5_) 
 <dependency>
     <groupId>org.apache.kafka</groupId>
     <artifactId>kafka-clients</artifactId>
-    <version>1.1.0</version>
+    <version>1.1.1</version>
 </dependency>
 
 <dependency>
     <groupId>org.apache.kafka</groupId>
     <artifactId>kafka-clients</artifactId>
-    <version>1.1.0</version>
+    <version>1.1.1</version>
     <classifier>test</classifier>
 </dependency>
 
 <dependency>
     <groupId>org.apache.kafka</groupId>
     <artifactId>kafka_2.11</artifactId>
-    <version>1.1.0</version>
+    <version>1.1.1</version>
     <scope>test</scope>
 </dependency>
 
 <dependency>
     <groupId>org.apache.kafka</groupId>
     <artifactId>kafka_2.11</artifactId>
-    <version>1.1.0</version>
+    <version>1.1.1</version>
     <classifier>test</classifier>
     <scope>test</scope>
 </dependency>
 ----
 
+Starting with version 2.1.9, the 2.0.0 `kafka-clients` jar can be used with similar overrides to those described above.
+
+[appendix]
 [[history]]
 == Change History
 
