@@ -59,6 +59,7 @@ import org.springframework.kafka.listener.config.ContainerProperties;
 import org.springframework.kafka.support.Acknowledgment;
 import org.springframework.kafka.support.TopicPartitionInitialOffset;
 import org.springframework.kafka.support.TopicPartitionInitialOffset.SeekPosition;
+import org.springframework.kafka.support.TransactionSupport;
 import org.springframework.kafka.transaction.KafkaTransactionManager;
 import org.springframework.scheduling.SchedulingAwareRunnable;
 import org.springframework.scheduling.TaskScheduler;
@@ -362,7 +363,8 @@ public class KafkaMessageListenerContainer<K, V> extends AbstractMessageListener
 		@SuppressWarnings("unchecked")
 		ListenerConsumer(GenericMessageListener<?> listener, ListenerType listenerType) {
 			Assert.state(!this.isAnyManualAck || !this.autoCommit,
-					"Consumer cannot be configured for auto commit for ackMode " + this.containerProperties.getAckMode());
+					"Consumer cannot be configured for auto commit for ackMode " + this.containerProperties
+							.getAckMode());
 			final Consumer<K, V> consumer = KafkaMessageListenerContainer.this.consumerFactory.createConsumer(
 					this.consumerGroupId, KafkaMessageListenerContainer.this.clientIdSuffix);
 			this.consumer = consumer;
@@ -789,7 +791,8 @@ public class KafkaMessageListenerContainer<K, V> extends AbstractMessageListener
 						Producer producer = null;
 						if (ListenerConsumer.this.kafkaTxManager != null) {
 							producer = ((KafkaResourceHolder) TransactionSynchronizationManager
-									.getResource(ListenerConsumer.this.kafkaTxManager.getProducerFactory())).getProducer();
+									.getResource(ListenerConsumer.this.kafkaTxManager.getProducerFactory()))
+									.getProducer();
 						}
 						RuntimeException aborted = doInvokeBatchListener(records, recordList, producer);
 						if (aborted != null) {
@@ -901,6 +904,8 @@ public class KafkaMessageListenerContainer<K, V> extends AbstractMessageListener
 					this.logger.trace("Processing " + record);
 				}
 				try {
+					TransactionSupport.setTransactionIdSuffix(
+							this.consumerGroupId + "." + record.topic() + "." + record.partition());
 					this.transactionTemplate.execute(new TransactionCallbackWithoutResult() {
 
 						@Override
@@ -908,7 +913,8 @@ public class KafkaMessageListenerContainer<K, V> extends AbstractMessageListener
 							Producer producer = null;
 							if (ListenerConsumer.this.kafkaTxManager != null) {
 								producer = ((KafkaResourceHolder) TransactionSynchronizationManager
-										.getResource(ListenerConsumer.this.kafkaTxManager.getProducerFactory())).getProducer();
+										.getResource(ListenerConsumer.this.kafkaTxManager.getProducerFactory()))
+										.getProducer();
 							}
 							RuntimeException aborted = doInvokeRecordListener(record, producer, iterator);
 							if (aborted != null) {
@@ -926,6 +932,9 @@ public class KafkaMessageListenerContainer<K, V> extends AbstractMessageListener
 						unprocessed.add(iterator.next());
 					}
 					getAfterRollbackProcessor().process(unprocessed, this.consumer);
+				}
+				finally {
+					TransactionSupport.clearTransactionIdSuffix();
 				}
 			}
 		}

@@ -28,3 +28,9 @@ See <<testing>> for more information.
 
 Starting with _version 2.0.5_, a new `AfterRollbackProcessor` strategy is provided - see <<after-rollback>> for more information.
 
+==== Transactional Id
+
+When a transaction is started by the listener container, the `transactional.id` is now the `transactionIdPrefix` appended with `<group.id>.<topic>.<partition>`.
+This is to allow proper fencing of zombies https://www.confluent.io/blog/transactions-apache-kafka/[as described here].
+
+
