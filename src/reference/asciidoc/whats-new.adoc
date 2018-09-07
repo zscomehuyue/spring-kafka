@@ -59,6 +59,11 @@ _Version 2.1.3_ introduced the `ChainedKafkaTransactionManager` see <<chained-tr
 Starting with _version 2.1.6_, a new `AfterRollbackProcessor` strategy is provided - see <<after-rollback>> for more information.
 
 
+==== Transactional Id
+
+When a transaction is started by the listener container, the `transactional.id` is now the `transactionIdPrefix` appended with `<group.id>.<topic>.<partition>`.
+This is to allow proper fencing of zombies https://www.confluent.io/blog/transactions-apache-kafka/[as described here].
+
 ==== Migration Guide from 2.0
 
 https://github.com/spring-projects/spring-kafka/wiki/Spring-for-Apache-Kafka-2.0-to-2.1-Migration-Guide[2.0 to 2.1 Migration].
