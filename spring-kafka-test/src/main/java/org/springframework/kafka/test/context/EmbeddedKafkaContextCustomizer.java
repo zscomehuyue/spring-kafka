@@ -40,6 +40,7 @@ import org.springframework.util.StringUtils;
  *
  * @author Artem Bilan
  * @author Elliot Metsger
+ * @author Oleg Artyomov
  *
  * @since 1.3
  */
@@ -99,6 +100,20 @@ class EmbeddedKafkaContextCustomizer implements ContextCustomizer {
 		beanFactory.initializeBean(kafkaEmbedded, KafkaEmbedded.BEAN_NAME);
 		beanFactory.registerSingleton(KafkaEmbedded.BEAN_NAME, kafkaEmbedded);
 		((DefaultSingletonBeanRegistry) beanFactory).registerDisposableBean(KafkaEmbedded.BEAN_NAME, kafkaEmbedded);
+	}
+
+	@Override
+	public int hashCode() {
+		return this.embeddedKafka.hashCode();
+	}
+
+	@Override
+	public boolean equals(Object obj) {
+		if (obj == null || obj.getClass() != getClass()) {
+			return false;
+		}
+		EmbeddedKafkaContextCustomizer customizer = (EmbeddedKafkaContextCustomizer) obj;
+		return this.embeddedKafka.equals(customizer.embeddedKafka);
 	}
 
 }
