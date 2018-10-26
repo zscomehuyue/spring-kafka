@@ -54,6 +54,7 @@ import org.springframework.core.task.SimpleAsyncTaskExecutor;
 import org.springframework.kafka.KafkaException;
 import org.springframework.kafka.core.ConsumerFactory;
 import org.springframework.kafka.core.KafkaResourceHolder;
+import org.springframework.kafka.core.ProducerFactory;
 import org.springframework.kafka.core.ProducerFactoryUtils;
 import org.springframework.kafka.event.ConsumerPausedEvent;
 import org.springframework.kafka.event.ConsumerResumedEvent;
@@ -544,6 +545,9 @@ public class KafkaMessageListenerContainer<K, V> extends AbstractMessageListener
 					if (this.consumerAwareListener != null) {
 						this.consumerAwareListener.onPartitionsRevokedAfterCommit(consumer, partitions);
 					}
+					if (ListenerConsumer.this.kafkaTxManager != null) {
+						closeProducers(partitions);
+					}
 				}
 
 				@Override
@@ -767,6 +771,9 @@ public class KafkaMessageListenerContainer<K, V> extends AbstractMessageListener
 					catch (WakeupException e) {
 						// No-op. Continue process
 					}
+				}
+				else {
+					closeProducers(getAssignedPartitions());
 				}
 			}
 			else {
@@ -1019,8 +1026,8 @@ public class KafkaMessageListenerContainer<K, V> extends AbstractMessageListener
 					this.logger.trace("Processing " + record);
 				}
 				try {
-					TransactionSupport.setTransactionIdSuffix(
-							this.consumerGroupId + "." + record.topic() + "." + record.partition());
+					TransactionSupport
+							.setTransactionIdSuffix(zombieFenceTxIdSuffix(record.topic(), record.partition()));
 					this.transactionTemplate.execute(new TransactionCallbackWithoutResult() {
 
 						@Override
@@ -1393,6 +1400,23 @@ public class KafkaMessageListenerContainer<K, V> extends AbstractMessageListener
 					+ ", consumerGroupId=" + this.consumerGroupId
 					+ ", clientIdSuffix=" + KafkaMessageListenerContainer.this.clientIdSuffix
 					+ "]";
+		}
+
+		private void closeProducers(Collection<TopicPartition> partitions) {
+			ProducerFactory<?, ?> producerFactory = this.kafkaTxManager.getProducerFactory();
+			partitions.forEach(tp -> {
+				try {
+					producerFactory.closeProducerFor(zombieFenceTxIdSuffix(tp.topic(), tp.partition()));
+				}
+				catch (Exception e) {
+					this.logger.error("Failed to close producer with transaction id suffix: "
+							+ zombieFenceTxIdSuffix(tp.topic(), tp.partition()), e);
+				}
+			});
+		}
+
+		private String zombieFenceTxIdSuffix(String topic, int partition) {
+			return this.consumerGroupId + "." + topic + "." + partition;
 		}
 
 		private final class ConsumerAcknowledgment implements Acknowledgment {
