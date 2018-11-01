@@ -1,5 +1,5 @@
 /*
- * Copyright 2016-2017 the original author or authors.
+ * Copyright 2016-2018 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@ package org.springframework.kafka.config;
 import java.lang.reflect.Method;
 import java.util.Arrays;
 
+import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
 import org.springframework.core.annotation.AnnotationUtils;
 import org.springframework.kafka.listener.KafkaListenerErrorHandler;
 import org.springframework.kafka.listener.MessageListenerContainer;
@@ -110,7 +111,14 @@ public class MethodKafkaListenerEndpoint<K, V> extends AbstractKafkaListenerEndp
 					throw new IllegalStateException("Invalid @" + SendTo.class.getSimpleName() + " annotation on '"
 							+ method + "' one destination must be set (got " + Arrays.toString(destinations) + ")");
 				}
-				return destinations.length == 1 ? resolve(destinations[0]) : "";
+				String topic = destinations.length == 1 ? destinations[0] : "";
+				if (getBeanFactory() instanceof ConfigurableListableBeanFactory) {
+					topic = ((ConfigurableListableBeanFactory) getBeanFactory()).resolveEmbeddedValue(topic);
+					if (topic != null) {
+						topic = resolve(topic);
+					}
+				}
+				return topic;
 			}
 		}
 		return null;
