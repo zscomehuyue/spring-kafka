@@ -255,6 +255,7 @@ public class KafkaTemplate<K, V> implements KafkaOperations<K, V> {
 
 	@Override
 	public <T> T executeInTransaction(OperationsCallback<K, V, T> callback) {
+		Assert.notNull(callback, "'callback' cannot be null");
 		Assert.state(this.transactional, "Producer factory does not support transactions");
 		Producer<K, V> producer = this.producers.get();
 		Assert.state(producer == null, "Nested calls to 'executeInTransaction' are not allowed");
@@ -269,7 +270,6 @@ public class KafkaTemplate<K, V> implements KafkaOperations<K, V> {
 		}
 
 		this.producers.set(producer);
-		T result = null;
 		try {
 			T result = callback.doInOperations(this);
 			try {
@@ -284,23 +284,13 @@ public class KafkaTemplate<K, V> implements KafkaOperations<K, V> {
 			throw ((RuntimeException) e.getCause());
 		}
 		catch (Exception e) {
-			try {
-				producer.abortTransaction();
-			}
-			finally {
-				this.producers.remove();
-				closeProducer(producer, false);
-			}
+			producer.abortTransaction();
 			throw e;
-		}
-		try {
-			producer.commitTransaction();
 		}
 		finally {
 			this.producers.remove();
 			closeProducer(producer, false);
 		}
-		return result;
 	}
 
 	/**
