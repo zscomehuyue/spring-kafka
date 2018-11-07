@@ -118,8 +118,7 @@ public class KafkaListenerAnnotationBeanPostProcessor<K, V>
 	 */
 	public static final String DEFAULT_KAFKA_LISTENER_CONTAINER_FACTORY_BEAN_NAME = "kafkaListenerContainerFactory";
 
-	private final Set<Class<?>> nonAnnotatedClasses =
-			Collections.newSetFromMap(new ConcurrentHashMap<Class<?>, Boolean>(64));
+	private final Set<Class<?>> nonAnnotatedClasses = Collections.newSetFromMap(new ConcurrentHashMap<>(64));
 
 	private final Log logger = LogFactory.getLog(getClass());
 
@@ -241,7 +240,7 @@ public class KafkaListenerAnnotationBeanPostProcessor<K, V>
 			Class<?> targetClass = AopUtils.getTargetClass(bean);
 			Collection<KafkaListener> classLevelListeners = findListenerAnnotations(targetClass);
 			final boolean hasClassLevelListeners = classLevelListeners.size() > 0;
-			final List<Method> multiMethods = new ArrayList<Method>();
+			final List<Method> multiMethods = new ArrayList<>();
 			Map<Method, Set<KafkaListener>> annotatedMethods = MethodIntrospector.selectMethods(targetClass,
 					new MethodIntrospector.MetadataLookup<Set<KafkaListener>>() {
 
@@ -288,7 +287,7 @@ public class KafkaListenerAnnotationBeanPostProcessor<K, V>
 	 * AnnotationUtils.getRepeatableAnnotations does not look at interfaces
 	 */
 	private Collection<KafkaListener> findListenerAnnotations(Class<?> clazz) {
-		Set<KafkaListener> listeners = new HashSet<KafkaListener>();
+		Set<KafkaListener> listeners = new HashSet<>();
 		KafkaListener ann = AnnotationUtils.findAnnotation(clazz, KafkaListener.class);
 		if (ann != null) {
 			listeners.add(ann);
@@ -318,12 +317,13 @@ public class KafkaListenerAnnotationBeanPostProcessor<K, V>
 
 	private void processMultiMethodListeners(Collection<KafkaListener> classLevelListeners, List<Method> multiMethods,
 			Object bean, String beanName) {
-		List<Method> checkedMethods = new ArrayList<Method>();
+
+		List<Method> checkedMethods = new ArrayList<>();
 		for (Method method : multiMethods) {
 			checkedMethods.add(checkProxy(method, bean));
 		}
 		for (KafkaListener classLevelListener : classLevelListeners) {
-			MultiMethodKafkaListenerEndpoint<K, V> endpoint = new MultiMethodKafkaListenerEndpoint<K, V>(checkedMethods,
+			MultiMethodKafkaListenerEndpoint<K, V> endpoint = new MultiMethodKafkaListenerEndpoint<>(checkedMethods,
 					bean);
 			endpoint.setBeanFactory(this.beanFactory);
 			processListener(endpoint, classLevelListener, bean, bean.getClass(), beanName);
@@ -332,7 +332,7 @@ public class KafkaListenerAnnotationBeanPostProcessor<K, V>
 
 	protected void processKafkaListener(KafkaListener kafkaListener, Method method, Object bean, String beanName) {
 		Method methodToUse = checkProxy(method, bean);
-		MethodKafkaListenerEndpoint<K, V> endpoint = new MethodKafkaListenerEndpoint<K, V>();
+		MethodKafkaListenerEndpoint<K, V> endpoint = new MethodKafkaListenerEndpoint<>();
 		endpoint.setMethod(methodToUse);
 		endpoint.setBeanFactory(this.beanFactory);
 		String errorHandlerBeanName = resolveExpressionAsString(kafkaListener.errorHandler(), "errorHandler");
@@ -462,7 +462,7 @@ public class KafkaListenerAnnotationBeanPostProcessor<K, V>
 			else if (resolved instanceof String) {
 				pattern = Pattern.compile((String) resolved);
 			}
-			else {
+			else if (resolved != null) {
 				throw new IllegalStateException(
 						"topicPattern must resolve to a Pattern or String, not " + resolved.getClass());
 			}
@@ -603,16 +603,15 @@ public class KafkaListenerAnnotationBeanPostProcessor<K, V>
 		if (resolved instanceof String) {
 			return (String) resolved;
 		}
-		else {
+		else if (resolved != null) {
 			throw new IllegalStateException("The [" + attribute + "] must resolve to a String. "
 					+ "Resolved to [" + resolved.getClass() + "] for [" + value + "]");
 		}
+		return null;
 	}
 
 	private Object resolveExpression(String value) {
-		String resolvedValue = resolve(value);
-
-		return this.resolver.evaluate(resolvedValue, this.expressionContext);
+		return this.resolver.evaluate(resolve(value), this.expressionContext);
 	}
 
 	/**
