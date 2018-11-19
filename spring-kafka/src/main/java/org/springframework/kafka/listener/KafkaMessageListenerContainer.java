@@ -62,6 +62,7 @@ import org.springframework.kafka.support.TopicPartitionInitialOffset;
 import org.springframework.kafka.support.TopicPartitionInitialOffset.SeekPosition;
 import org.springframework.kafka.support.TransactionSupport;
 import org.springframework.kafka.transaction.KafkaTransactionManager;
+import org.springframework.lang.Nullable;
 import org.springframework.scheduling.SchedulingAwareRunnable;
 import org.springframework.scheduling.TaskScheduler;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
@@ -153,6 +154,7 @@ public class KafkaMessageListenerContainer<K, V> extends AbstractMessageListener
 	 * @return the {@link TopicPartition}s currently assigned to this container,
 	 * either explicitly or by Kafka; may be null if not assigned yet.
 	 */
+	@Nullable
 	public Collection<TopicPartition> getAssignedPartitions() {
 		ListenerConsumer listenerConsumer = this.listenerConsumer;
 		if (listenerConsumer != null) {
@@ -1258,17 +1260,19 @@ public class KafkaMessageListenerContainer<K, V> extends AbstractMessageListener
 			this.seeks.add(new TopicPartitionInitialOffset(topic, partition, SeekPosition.END));
 		}
 
-		private void closeProducers(Collection<TopicPartition> partitions) {
-			ProducerFactory<?, ?> producerFactory = this.kafkaTxManager.getProducerFactory();
-			partitions.forEach(tp -> {
-				try {
-					producerFactory.closeProducerFor(zombieFenceTxIdSuffix(tp.topic(), tp.partition()));
-				}
-				catch (Exception e) {
-					this.logger.error("Failed to close producer with transaction id suffix: "
-							+ zombieFenceTxIdSuffix(tp.topic(), tp.partition()), e);
-				}
-			});
+		private void closeProducers(@Nullable Collection<TopicPartition> partitions) {
+			if (partitions != null) {
+				ProducerFactory<?, ?> producerFactory = this.kafkaTxManager.getProducerFactory();
+				partitions.forEach(tp -> {
+					try {
+						producerFactory.closeProducerFor(zombieFenceTxIdSuffix(tp.topic(), tp.partition()));
+					}
+					catch (Exception e) {
+						this.logger.error("Failed to close producer with transaction id suffix: "
+								+ zombieFenceTxIdSuffix(tp.topic(), tp.partition()), e);
+					}
+				});
+			}
 		}
 
 		private String zombieFenceTxIdSuffix(String topic, int partition) {
