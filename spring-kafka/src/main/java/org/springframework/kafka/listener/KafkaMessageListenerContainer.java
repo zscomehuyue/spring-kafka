@@ -1236,7 +1236,8 @@ public class KafkaMessageListenerContainer<K, V> extends AbstractMessageListener
 		}
 
 		private void closeProducers(Collection<TopicPartition> partitions) {
-			if (this.kafkaTxManager.getProducerFactory() instanceof DefaultKafkaProducerFactory) {
+			if (partitions != null &&
+					this.kafkaTxManager.getProducerFactory() instanceof DefaultKafkaProducerFactory) {
 				DefaultKafkaProducerFactory<?, ?> producerFactory =
 						(DefaultKafkaProducerFactory<?, ?>) this.kafkaTxManager.getProducerFactory();
 				for (TopicPartition tp : partitions) {
