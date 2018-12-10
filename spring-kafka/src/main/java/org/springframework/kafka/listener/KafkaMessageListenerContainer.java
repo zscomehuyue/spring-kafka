@@ -374,6 +374,12 @@ public class KafkaMessageListenerContainer<K, V> extends AbstractMessageListener
 
 			ConsumerRebalanceListener rebalanceListener = createRebalanceListener(consumer);
 
+			if (this.transactionManager != null) {
+				this.transactionTemplate = new TransactionTemplate(this.transactionManager);
+			}
+			else {
+				this.transactionTemplate = null;
+			}
 			if (KafkaMessageListenerContainer.this.topicPartitions == null) {
 				if (this.containerProperties.getTopicPattern() != null) {
 					consumer.subscribe(this.containerProperties.getTopicPattern(), rebalanceListener);
@@ -437,12 +443,6 @@ public class KafkaMessageListenerContainer<K, V> extends AbstractMessageListener
 				this.batchErrorHandler = new BatchLoggingErrorHandler();
 			}
 			Assert.state(!this.isBatchListener || !this.isRecordAck, "Cannot use AckMode.RECORD with a batch listener");
-			if (this.transactionManager != null) {
-				this.transactionTemplate = new TransactionTemplate(this.transactionManager);
-			}
-			else {
-				this.transactionTemplate = null;
-			}
 			if (this.containerProperties.getScheduler() != null) {
 				this.taskScheduler = this.containerProperties.getScheduler();
 				this.taskSchedulerExplicitlySet = true;
@@ -519,18 +519,31 @@ public class KafkaMessageListenerContainer<K, V> extends AbstractMessageListener
 						}
 						if (ListenerConsumer.this.transactionTemplate != null &&
 								ListenerConsumer.this.kafkaTxManager != null) {
-							ListenerConsumer.this.transactionTemplate.execute(new TransactionCallbackWithoutResult() {
+							try {
+								for (Entry<TopicPartition, OffsetAndMetadata> entry : offsets.entrySet()) {
+									final TopicPartition partition = entry.getKey();
+									final OffsetAndMetadata offsetAndMetadata = entry.getValue();
+									TransactionSupport.setTransactionIdSuffix(
+											zombieFenceTxIdSuffix(partition.topic(), partition.partition()));
+									ListenerConsumer.this.transactionTemplate
+											.execute(new TransactionCallbackWithoutResult() {
 
-								@SuppressWarnings({ "unchecked", "rawtypes" })
-								@Override
-								protected void doInTransactionWithoutResult(TransactionStatus status) {
-									((KafkaResourceHolder) TransactionSynchronizationManager
-											.getResource(ListenerConsumer.this.kafkaTxManager.getProducerFactory()))
-											.getProducer().sendOffsetsToTransaction(offsets,
-											ListenerConsumer.this.consumerGroupId);
+										@SuppressWarnings({ "unchecked", "rawtypes" })
+										@Override
+										protected void doInTransactionWithoutResult(TransactionStatus status) {
+											((KafkaResourceHolder) TransactionSynchronizationManager
+													.getResource(ListenerConsumer.this.kafkaTxManager.getProducerFactory()))
+													.getProducer().sendOffsetsToTransaction(
+															Collections.singletonMap(partition, offsetAndMetadata),
+															ListenerConsumer.this.consumerGroupId);
+										}
+
+									});
 								}
-
-							});
+							}
+							finally {
+								TransactionSupport.clearTransactionIdSuffix();
+							}
 						}
 						else if (KafkaMessageListenerContainer.this.getContainerProperties().isSyncCommits()) {
 							ListenerConsumer.this.consumer.commitSync(offsets);
