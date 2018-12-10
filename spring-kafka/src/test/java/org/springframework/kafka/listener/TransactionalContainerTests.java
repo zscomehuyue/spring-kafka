@@ -29,7 +29,9 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
@@ -67,6 +69,7 @@ import org.springframework.kafka.core.ProducerFactory;
 import org.springframework.kafka.core.ProducerFactoryUtils;
 import org.springframework.kafka.listener.config.ContainerProperties;
 import org.springframework.kafka.support.TopicPartitionInitialOffset;
+import org.springframework.kafka.support.TransactionSupport;
 import org.springframework.kafka.test.rule.KafkaEmbedded;
 import org.springframework.kafka.test.utils.KafkaTestUtils;
 import org.springframework.kafka.transaction.KafkaTransactionManager;
@@ -132,14 +135,18 @@ public class TransactionalContainerTests {
 		ConsumerFactory cf = mock(ConsumerFactory.class);
 		willReturn(consumer).given(cf).createConsumer("group", null);
 		Producer producer = mock(Producer.class);
-		final CountDownLatch closeLatch = new CountDownLatch(1);
+		final CountDownLatch closeLatch = new CountDownLatch(2);
 		willAnswer(i -> {
 			closeLatch.countDown();
 			return null;
 		}).given(producer).close();
 		ProducerFactory pf = mock(ProducerFactory.class);
 		given(pf.transactionCapable()).willReturn(true);
-		given(pf.createProducer()).willReturn(producer);
+		final List<String> transactionalIds = new ArrayList<>();
+		willAnswer(i -> {
+			transactionalIds.add(TransactionSupport.getTransactionIdSuffix());
+			return producer;
+		}).given(pf).createProducer();
 		KafkaTransactionManager tm = new KafkaTransactionManager(pf);
 		ContainerProperties props = new ContainerProperties("foo");
 		props.setGroupId("group");
@@ -161,6 +168,11 @@ public class TransactionalContainerTests {
 		assertThat(closeLatch.await(10, TimeUnit.SECONDS)).isTrue();
 		InOrder inOrder = inOrder(producer);
 		inOrder.verify(producer).beginTransaction();
+		inOrder.verify(producer).sendOffsetsToTransaction(Collections.singletonMap(topicPartition,
+				new OffsetAndMetadata(0)), "group");
+		inOrder.verify(producer).commitTransaction();
+		inOrder.verify(producer).close();
+		inOrder.verify(producer).beginTransaction();
 		ArgumentCaptor<ProducerRecord> captor = ArgumentCaptor.forClass(ProducerRecord.class);
 		inOrder.verify(producer).send(captor.capture(), any(Callback.class));
 		assertThat(captor.getValue()).isEqualTo(new ProducerRecord("bar", "baz"));
@@ -169,7 +181,10 @@ public class TransactionalContainerTests {
 		inOrder.verify(producer).commitTransaction();
 		inOrder.verify(producer).close();
 		container.stop();
-		verify(pf, times(1)).createProducer();
+		verify(pf, times(2)).createProducer();
+		verifyNoMoreInteractions(producer);
+		assertThat(transactionalIds.get(0)).isEqualTo("group.foo.0");
+		assertThat(transactionalIds.get(0)).isEqualTo("group.foo.0");
 	}
 
 	@SuppressWarnings({ "rawtypes", "unchecked" })
@@ -409,7 +424,7 @@ public class TransactionalContainerTests {
 			}
 		});
 
-		@SuppressWarnings({ "rawtypes", "unchecked" })
+		@SuppressWarnings({ "rawtypes" })
 		KafkaTransactionManager tm = new KafkaTransactionManager(pf);
 		containerProps.setTransactionManager(tm);
 		KafkaMessageListenerContainer<Integer, String> container =
