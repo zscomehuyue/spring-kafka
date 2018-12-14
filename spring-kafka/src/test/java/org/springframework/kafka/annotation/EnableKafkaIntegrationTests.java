@@ -255,6 +255,8 @@ public class EnableKafkaIntegrationTests {
 		template.flush();
 		assertThat(this.multiListener.latch1.await(60, TimeUnit.SECONDS)).isTrue();
 		assertThat(this.multiListener.latch2.await(60, TimeUnit.SECONDS)).isTrue();
+		template.send("annotated8", 0, 1, "junk");
+		assertThat(this.multiListener.errorLatch.await(60, TimeUnit.SECONDS)).isTrue();
 	}
 
 	@Test
@@ -607,6 +609,14 @@ public class EnableKafkaIntegrationTests {
 			};
 		}
 
+		@Bean
+		public KafkaListenerErrorHandler consumeMultiMethodException(MultiListenerBean listener) {
+			return (m, e) -> {
+				listener.errorLatch.countDown();
+				return null;
+			};
+		}
+
 	}
 
 	static class Listener implements ConsumerSeekAware {
@@ -864,16 +874,23 @@ public class EnableKafkaIntegrationTests {
 
 	}
 
-	@KafkaListener(id = "multi", topics = "annotated8")
+	@KafkaListener(id = "multi", topics = "annotated8", errorHandler = "consumeMultiMethodException")
 	static class MultiListenerBean {
 
 		private final CountDownLatch latch1 = new CountDownLatch(1);
 
 		private final CountDownLatch latch2 = new CountDownLatch(1);
 
+		private final CountDownLatch errorLatch = new CountDownLatch(1);
+
 		@KafkaHandler
 		public void bar(@Payload String bar) {
-			latch1.countDown();
+			if ("junk".equals(bar)) {
+				throw new RuntimeException("intentional");
+			}
+			else {
+				this.latch1.countDown();
+			}
 		}
 
 		@KafkaHandler
