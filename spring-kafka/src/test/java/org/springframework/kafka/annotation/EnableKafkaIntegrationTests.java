@@ -1099,6 +1099,14 @@ public class EnableKafkaIntegrationTests {
 			return new FooConverter();
 		}
 
+		@Bean
+		public KafkaListenerErrorHandler consumeMultiMethodException(MultiListenerBean listener) {
+			return (m, e) -> {
+				listener.errorLatch.countDown();
+				return null;
+			};
+		}
+
 	}
 
 	static class Listener implements ConsumerSeekAware {
