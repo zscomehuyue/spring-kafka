@@ -312,14 +312,17 @@ public class EnableKafkaIntegrationTests {
 		ConsumerFactory<Integer, String> cf = new DefaultKafkaConsumerFactory<>(consumerProps);
 		Consumer<Integer, String> consumer = cf.createConsumer();
 		embeddedKafka.consumeFromAnEmbeddedTopic(consumer, "annotated8reply");
-		template.send("annotated8", 0, 1, "foo");
-		template.send("annotated8", 0, 1, null);
-		template.flush();
+		this.template.send("annotated8", 0, 1, "foo");
+		this.template.send("annotated8", 0, 1, null);
+		this.template.flush();
 		assertThat(this.multiListener.latch1.await(60, TimeUnit.SECONDS)).isTrue();
 		assertThat(this.multiListener.latch2.await(60, TimeUnit.SECONDS)).isTrue();
 		ConsumerRecord<Integer, String> reply = KafkaTestUtils.getSingleRecord(consumer, "annotated8reply");
 		assertThat(reply.value()).isEqualTo("OK");
 		consumer.close();
+
+		template.send("annotated8", 0, 1, "junk");
+		assertThat(this.multiListener.errorLatch.await(60, TimeUnit.SECONDS)).isTrue();
 	}
 
 	@Test
@@ -1472,16 +1475,23 @@ public class EnableKafkaIntegrationTests {
 
 	}
 
-	@KafkaListener(id = "multi", topics = "annotated8")
+	@KafkaListener(id = "multi", topics = "annotated8", errorHandler = "consumeMultiMethodException")
 	static class MultiListenerBean {
 
 		private final CountDownLatch latch1 = new CountDownLatch(1);
 
 		private final CountDownLatch latch2 = new CountDownLatch(1);
 
+		private final CountDownLatch errorLatch = new CountDownLatch(1);
+
 		@KafkaHandler
 		public void bar(@NonNull String bar) {
-			this.latch1.countDown();
+			if ("junk".equals(bar)) {
+				throw new RuntimeException("intentional");
+			}
+			else {
+				this.latch1.countDown();
+			}
 		}
 
 		@KafkaHandler
