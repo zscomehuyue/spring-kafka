@@ -928,6 +928,14 @@ public class EnableKafkaIntegrationTests {
 			};
 		}
 
+		@Bean
+		public KafkaListenerErrorHandler consumeMultiMethodException(MultiListenerBean listener) {
+			return (m, e) -> {
+				listener.errorLatch.countDown();
+				return null;
+			};
+		}
+
 	}
 
 	static class Listener implements ConsumerSeekAware {
@@ -1273,14 +1281,6 @@ public class EnableKafkaIntegrationTests {
 
 		public CountDownLatch getLatch2() {
 			return latch2;
-		}
-
-		@Bean
-		public KafkaListenerErrorHandler consumeMultiMethodException(MultiListenerBean listener) {
-			return (m, e) -> {
-				listener.errorLatch.countDown();
-				return null;
-			};
 		}
 
 	}
