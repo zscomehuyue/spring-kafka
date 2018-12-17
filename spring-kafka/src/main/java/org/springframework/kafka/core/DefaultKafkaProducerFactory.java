@@ -48,6 +48,7 @@ import org.apache.kafka.common.serialization.Serializer;
 import org.springframework.beans.factory.DisposableBean;
 import org.springframework.context.Lifecycle;
 import org.springframework.kafka.support.TransactionSupport;
+import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
 
 /**
@@ -317,12 +318,13 @@ public class DefaultKafkaProducerFactory<K, V> implements ProducerFactory<K, V>,
 	}
 
 	private CloseSafeProducer<K, V> doCreateTxProducer(String suffix, Consumer<CloseSafeProducer<K, V>> remover) {
-		Producer<K, V> producer;
-		Map<String, Object> configs = new HashMap<>(this.configs);
-		configs.put(ProducerConfig.TRANSACTIONAL_ID_CONFIG, this.transactionIdPrefix + suffix);
-		producer = new KafkaProducer<K, V>(configs, this.keySerializer, this.valueSerializer);
-		producer.initTransactions();
-		return new CloseSafeProducer<K, V>(producer, this.cache, remover);
+		Producer<K, V> newProducer;
+		Map<String, Object> newProducerConfigs = new HashMap<>(this.configs);
+		newProducerConfigs.put(ProducerConfig.TRANSACTIONAL_ID_CONFIG, this.transactionIdPrefix + suffix);
+		newProducer = new KafkaProducer<K, V>(newProducerConfigs, this.keySerializer, this.valueSerializer);
+		newProducer.initTransactions();
+		return new CloseSafeProducer<K, V>(newProducer, this.cache, remover,
+				(String) newProducerConfigs.get(ProducerConfig.TRANSACTIONAL_ID_CONFIG));
 	}
 
 	protected BlockingQueue<CloseSafeProducer<K, V>> getCache() {
@@ -356,6 +358,8 @@ public class DefaultKafkaProducerFactory<K, V> implements ProducerFactory<K, V>,
 
 		private final Consumer<CloseSafeProducer<K, V>> removeConsumerProducer;
 
+		private final String txId;
+
 		private volatile boolean txFailed;
 
 		CloseSafeProducer(Producer<K, V> delegate) {
@@ -369,9 +373,17 @@ public class DefaultKafkaProducerFactory<K, V> implements ProducerFactory<K, V>,
 
 		CloseSafeProducer(Producer<K, V> delegate, BlockingQueue<CloseSafeProducer<K, V>> cache,
 				Consumer<CloseSafeProducer<K, V>> removeConsumerProducer) {
+
+			this(delegate, cache, removeConsumerProducer, null);
+		}
+
+		CloseSafeProducer(Producer<K, V> delegate, @Nullable BlockingQueue<CloseSafeProducer<K, V>> cache,
+				@Nullable Consumer<CloseSafeProducer<K, V>> removeConsumerProducer, @Nullable String txId) {
+
 			this.delegate = delegate;
 			this.cache = cache;
 			this.removeConsumerProducer = removeConsumerProducer;
+			this.txId = txId;
 		}
 
 		@Override
@@ -406,10 +418,16 @@ public class DefaultKafkaProducerFactory<K, V> implements ProducerFactory<K, V>,
 
 		@Override
 		public void beginTransaction() throws ProducerFencedException {
+			if (logger.isDebugEnabled()) {
+				logger.debug("beginTransaction: " + this);
+			}
 			try {
 				this.delegate.beginTransaction();
 			}
 			catch (RuntimeException e) {
+				if (logger.isErrorEnabled()) {
+					logger.error("beginTransaction failed: " + this, e);
+				}
 				this.txFailed = true;
 				throw e;
 			}
@@ -418,16 +436,22 @@ public class DefaultKafkaProducerFactory<K, V> implements ProducerFactory<K, V>,
 		@Override
 		public void sendOffsetsToTransaction(Map<TopicPartition, OffsetAndMetadata> offsets, String consumerGroupId)
 				throws ProducerFencedException {
+
 			this.delegate.sendOffsetsToTransaction(offsets, consumerGroupId);
 		}
 
 		@Override
 		public void commitTransaction() throws ProducerFencedException {
+			if (logger.isDebugEnabled()) {
+				logger.debug("commitTransaction: " + this);
+			}
 			try {
 				this.delegate.commitTransaction();
 			}
 			catch (RuntimeException e) {
-				logger.error("Commit failed", e);
+				if (logger.isErrorEnabled()) {
+					logger.error("commitTransaction failed: " + this, e);
+				}
 				this.txFailed = true;
 				throw e;
 			}
@@ -435,11 +459,16 @@ public class DefaultKafkaProducerFactory<K, V> implements ProducerFactory<K, V>,
 
 		@Override
 		public void abortTransaction() throws ProducerFencedException {
+			if (logger.isDebugEnabled()) {
+				logger.debug("abortTransaction: " + this);
+			}
 			try {
 				this.delegate.abortTransaction();
 			}
 			catch (RuntimeException e) {
-				logger.error("Abort failed", e);
+				if (logger.isErrorEnabled()) {
+					logger.error("Abort failed: " + this, e);
+				}
 				this.txFailed = true;
 				throw e;
 			}
@@ -447,20 +476,39 @@ public class DefaultKafkaProducerFactory<K, V> implements ProducerFactory<K, V>,
 
 		@Override
 		public void close() {
+			close(0, null);
+		}
+
+		@Override
+		public void close(long timeout, @Nullable TimeUnit unit) {
 			if (this.cache != null) {
 				if (this.txFailed) {
-					logger.warn("Error during transactional operation; producer removed from cache; possible cause: "
-							+ "broker restarted during transaction");
-
-					this.delegate.close();
+					if (logger.isWarnEnabled()) {
+						logger.warn("Error during transactional operation; producer removed from cache; possible cause: "
+							+ "broker restarted during transaction: " + this);
+					}
+					if (unit == null) {
+						this.delegate.close();
+					}
+					else {
+						this.delegate.close(timeout, unit);
+					}
 					if (this.removeConsumerProducer != null) {
 						this.removeConsumerProducer.accept(this);
 					}
 				}
 				else {
-					synchronized (this) {
-						if (!this.cache.contains(this)) {
-							this.cache.offer(this);
+					if (this.removeConsumerProducer == null) { // dedicated consumer producers are not cached
+						synchronized (this) {
+							if (!this.cache.contains(this)
+									&& !this.cache.offer(this)) {
+								if (unit == null) {
+									this.delegate.close();
+								}
+								else {
+									this.delegate.close(timeout, unit);
+								}
+							}
 						}
 					}
 				}
@@ -468,13 +516,10 @@ public class DefaultKafkaProducerFactory<K, V> implements ProducerFactory<K, V>,
 		}
 
 		@Override
-		public void close(long timeout, TimeUnit unit) {
-			close();
-		}
-
-		@Override
 		public String toString() {
-			return "CloseSafeProducer [delegate=" + this.delegate + "]";
+			return "CloseSafeProducer [delegate=" + this.delegate + ""
+					+ (this.txId != null ? ", txId=" + this.txId : "")
+					+ "]";
 		}
 
 	}
