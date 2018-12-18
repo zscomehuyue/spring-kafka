@@ -40,6 +40,7 @@ import org.springframework.kafka.test.context.EmbeddedKafka;
 import org.springframework.kafka.test.rule.KafkaEmbedded;
 import org.springframework.kafka.test.utils.KafkaTestUtils;
 import org.springframework.kafka.transaction.KafkaTransactionManager;
+import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.junit4.SpringRunner;
 import org.springframework.util.concurrent.ListenableFuture;
 
@@ -54,6 +55,7 @@ import org.springframework.util.concurrent.ListenableFuture;
 				"transaction.state.log.min.isr=1" }
 )
 @RunWith(SpringRunner.class)
+@DirtiesContext
 public class DefaultKafkaConsumerFactoryTests {
 
 	@Autowired
