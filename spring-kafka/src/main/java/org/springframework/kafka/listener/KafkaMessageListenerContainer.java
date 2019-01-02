@@ -1128,7 +1128,7 @@ public class KafkaMessageListenerContainer<K, V> extends AbstractMessageListener
 					throw e;
 				}
 				try {
-					if (this.errorHandler instanceof ContainerAwareErrorHandler) {
+					if (this.errorHandler instanceof RemainingRecordsErrorHandler) {
 						if (producer == null) {
 							processCommits();
 						}
@@ -1137,7 +1137,7 @@ public class KafkaMessageListenerContainer<K, V> extends AbstractMessageListener
 						while (iterator.hasNext()) {
 							records.add(iterator.next());
 						}
-						((ContainerAwareErrorHandler) this.errorHandler).handle(e, records, this.consumer,
+						this.errorHandler.handle(e, records, this.consumer,
 								KafkaMessageListenerContainer.this.container);
 					}
 					else {
