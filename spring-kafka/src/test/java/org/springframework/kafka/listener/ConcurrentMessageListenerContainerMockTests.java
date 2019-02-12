@@ -18,6 +18,7 @@ package org.springframework.kafka.listener;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willAnswer;
 import static org.mockito.Mockito.mock;
@@ -33,9 +34,12 @@ import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.junit.jupiter.api.Test;
 
 import org.springframework.kafka.core.ConsumerFactory;
+import org.springframework.kafka.listener.config.ContainerProperties;
 
 /**
  * @author Gary Russell
+ * @author Artem Bilan
+ *
  * @since 2.2.4
  *
  */
@@ -45,7 +49,7 @@ public class ConcurrentMessageListenerContainerMockTests {
 	@Test
 	public void testCorrectContainerForConsumerError() throws InterruptedException {
 		ConsumerFactory consumerFactory = mock(ConsumerFactory.class);
-		final Consumer consumer = mock(Consumer.class);
+		Consumer consumer = mock(Consumer.class);
 		AtomicBoolean first = new AtomicBoolean(true);
 		willAnswer(invocation -> {
 			if (first.getAndSet(false)) {
@@ -53,19 +57,21 @@ public class ConcurrentMessageListenerContainerMockTests {
 			}
 			Thread.sleep(100);
 			return new ConsumerRecords<>(Collections.emptyMap());
-		}).given(consumer).poll(any());
-		given(consumerFactory.createConsumer("grp", "", "-0", null)).willReturn(consumer);
+		}).given(consumer)
+				.poll(anyLong());
+
+		given(consumerFactory.createConsumer("grp", "", "-0")).willReturn(consumer);
 		ContainerProperties containerProperties = new ContainerProperties("foo");
 		containerProperties.setGroupId("grp");
 		containerProperties.setMessageListener((MessageListener) record -> { });
-		ConcurrentMessageListenerContainer container = new ConcurrentMessageListenerContainer<>(consumerFactory,
-				containerProperties);
 		CountDownLatch latch = new CountDownLatch(1);
 		AtomicReference<MessageListenerContainer> errorContainer = new AtomicReference<>();
-		container.setErrorHandler((ContainerAwareErrorHandler) (thrownException, records, consumer1, ec) -> {
+		containerProperties.setErrorHandler((ContainerAwareErrorHandler) (thrownException, records, consumer1, ec) -> {
 			errorContainer.set(ec);
 			latch.countDown();
 		});
+		ConcurrentMessageListenerContainer container = new ConcurrentMessageListenerContainer<>(consumerFactory,
+				containerProperties);
 		container.start();
 		assertThat(latch.await(10, TimeUnit.SECONDS)).isTrue();
 		assertThat(errorContainer.get()).isSameAs(container);
