@@ -810,7 +810,7 @@ public class KafkaMessageListenerContainer<K, V> extends AbstractMessageListener
 			try {
 				if (!this.isBatchListener && this.errorHandler != null) {
 					this.errorHandler.handle(e, Collections.emptyList(), this.consumer,
-							KafkaMessageListenerContainer.this);
+							KafkaMessageListenerContainer.this.container);
 				}
 				else if (this.isBatchListener && this.batchErrorHandler != null) {
 					this.batchErrorHandler.handle(e, new ConsumerRecords<K, V>(Collections.emptyMap()), this.consumer,
