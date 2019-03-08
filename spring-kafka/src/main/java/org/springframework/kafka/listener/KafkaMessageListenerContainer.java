@@ -573,14 +573,14 @@ public class KafkaMessageListenerContainer<K, V> // NOSONAR comment density
 			}
 		}
 
-		private void subscribeOrAssignTopics(final Consumer<? super K, ? super V> consumer) {
+		private void subscribeOrAssignTopics(final Consumer<? super K, ? super V> subscribingConsumer) {
 			if (KafkaMessageListenerContainer.this.topicPartitions == null) {
 				ConsumerRebalanceListener rebalanceListener = new ListenerConsumerRebalanceListener();
 				if (this.containerProperties.getTopicPattern() != null) {
-					consumer.subscribe(this.containerProperties.getTopicPattern(), rebalanceListener);
+					subscribingConsumer.subscribe(this.containerProperties.getTopicPattern(), rebalanceListener);
 				}
 				else {
-					consumer.subscribe(Arrays.asList(this.containerProperties.getTopics()), rebalanceListener);
+					subscribingConsumer.subscribe(Arrays.asList(this.containerProperties.getTopics()), rebalanceListener);
 				}
 			}
 			else {
@@ -592,7 +592,7 @@ public class KafkaMessageListenerContainer<K, V> // NOSONAR comment density
 							new OffsetMetadata(topicPartition.initialOffset(), topicPartition.isRelativeToCurrent(),
 									topicPartition.getPosition()));
 				}
-				consumer.assign(new ArrayList<>(this.definedPartitions.keySet()));
+				subscribingConsumer.assign(new ArrayList<>(this.definedPartitions.keySet()));
 			}
 		}
 
@@ -695,7 +695,7 @@ public class KafkaMessageListenerContainer<K, V> // NOSONAR comment density
 				try {
 					pollAndInvoke();
 				}
-				catch (WakeupException e) {
+				catch (@SuppressWarnings("unused") WakeupException e) {
 					// Ignore, we're stopping
 				}
 				catch (NoOffsetForPartitionException nofpe) {
@@ -814,7 +814,7 @@ public class KafkaMessageListenerContainer<K, V> // NOSONAR comment density
 					try {
 						this.consumer.unsubscribe();
 					}
-					catch (WakeupException e) {
+					catch (@SuppressWarnings("unused") WakeupException e) {
 						// No-op. Continue process
 					}
 				}
@@ -900,7 +900,7 @@ public class KafkaMessageListenerContainer<K, V> // NOSONAR comment density
 					try {
 						ackImmediate(record);
 					}
-					catch (WakeupException e) {
+					catch (@SuppressWarnings("unused") WakeupException e) {
 						// ignore - not polling
 					}
 				}
@@ -950,6 +950,7 @@ public class KafkaMessageListenerContainer<K, V> // NOSONAR comment density
 		@SuppressWarnings({ UNCHECKED, RAW_TYPES })
 		private void invokeBatchListenerInTx(final ConsumerRecords<K, V> records,
 				final List<ConsumerRecord<K, V>> recordList) {
+
 			try {
 				this.transactionTemplate.execute(new TransactionCallbackWithoutResult() {
 
@@ -972,12 +973,31 @@ public class KafkaMessageListenerContainer<K, V> // NOSONAR comment density
 				this.logger.error("Transaction rolled back", e);
 				AfterRollbackProcessor<K, V> afterRollbackProcessorToUse =
 						(AfterRollbackProcessor<K, V>) getAfterRollbackProcessor();
-				if (recordList == null) {
-					afterRollbackProcessorToUse.process(createRecordList(records), this.consumer, e, false);
+				if (afterRollbackProcessorToUse.isProcessInTransaction() && this.transactionTemplate != null) {
+					this.transactionTemplate.execute(new TransactionCallbackWithoutResult() {
+
+						@Override
+						protected void doInTransactionWithoutResult(TransactionStatus status) {
+							batchAfterRollback(records, recordList, e, afterRollbackProcessorToUse);
+						}
+
+					});
 				}
 				else {
-					afterRollbackProcessorToUse.process(recordList, this.consumer, e, false);
+					batchAfterRollback(records, recordList, e, afterRollbackProcessorToUse);
 				}
+			}
+		}
+
+		private void batchAfterRollback(final ConsumerRecords<K, V> records,
+				final List<ConsumerRecord<K, V>> recordList, RuntimeException e,
+				AfterRollbackProcessor<K, V> afterRollbackProcessorToUse) {
+
+			if (recordList == null) {
+				afterRollbackProcessorToUse.process(createRecordList(records), this.consumer, e, false);
+			}
+			else {
+				afterRollbackProcessorToUse.process(recordList, this.consumer, e, false);
 			}
 		}
 
@@ -1020,7 +1040,7 @@ public class KafkaMessageListenerContainer<K, V> // NOSONAR comment density
 					throw er;
 				}
 			}
-			catch (InterruptedException e) {
+			catch (@SuppressWarnings("unused") InterruptedException e) {
 				Thread.currentThread().interrupt();
 			}
 			return null;
@@ -1101,7 +1121,7 @@ public class KafkaMessageListenerContainer<K, V> // NOSONAR comment density
 		 * Invoke the listener with each record in a separate transaction.
 		 * @param records the records.
 		 */
-		@SuppressWarnings({ UNCHECKED, RAW_TYPES })
+		@SuppressWarnings(RAW_TYPES)
 		private void invokeRecordListenerInTx(final ConsumerRecords<K, V> records) {
 			Iterator<ConsumerRecord<K, V>> iterator = records.iterator();
 			while (iterator.hasNext()) {
@@ -1132,17 +1152,37 @@ public class KafkaMessageListenerContainer<K, V> // NOSONAR comment density
 				}
 				catch (RuntimeException e) {
 					this.logger.error("Transaction rolled back", e);
-					List<ConsumerRecord<K, V>> unprocessed = new ArrayList<>();
-					unprocessed.add(record);
-					while (iterator.hasNext()) {
-						unprocessed.add(iterator.next());
-					}
-					((AfterRollbackProcessor<K, V>) getAfterRollbackProcessor())
-							.process(unprocessed, this.consumer, e, true);
+					recordAfterRollback(iterator, record, e);
 				}
 				finally {
 					TransactionSupport.clearTransactionIdSuffix();
 				}
+			}
+		}
+
+		private void recordAfterRollback(Iterator<ConsumerRecord<K, V>> iterator, final ConsumerRecord<K, V> record,
+				RuntimeException e) {
+
+			List<ConsumerRecord<K, V>> unprocessed = new ArrayList<>();
+			unprocessed.add(record);
+			while (iterator.hasNext()) {
+				unprocessed.add(iterator.next());
+			}
+			@SuppressWarnings(UNCHECKED)
+			AfterRollbackProcessor<K, V> afterRollbackProcessorToUse =
+					(AfterRollbackProcessor<K, V>) getAfterRollbackProcessor();
+			if (afterRollbackProcessorToUse.isProcessInTransaction() && this.transactionTemplate != null) {
+				this.transactionTemplate.execute(new TransactionCallbackWithoutResult() {
+
+					@Override
+					protected void doInTransactionWithoutResult(TransactionStatus status) {
+						afterRollbackProcessorToUse.process(unprocessed, ListenerConsumer.this.consumer, e, true);
+					}
+
+				});
+			}
+			else {
+				afterRollbackProcessorToUse.process(unprocessed, this.consumer, e, true);
 			}
 		}
 
@@ -1499,7 +1539,7 @@ public class KafkaMessageListenerContainer<K, V> // NOSONAR comment density
 						this.consumer.commitAsync(commits, this.commitCallback);
 					}
 				}
-				catch (WakeupException e) {
+				catch (@SuppressWarnings("unused") WakeupException e) {
 					// ignore - not polling
 					this.logger.debug("Woken up during commit");
 				}

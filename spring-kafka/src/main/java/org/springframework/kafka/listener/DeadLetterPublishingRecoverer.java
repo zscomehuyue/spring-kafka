@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 the original author or authors.
+ * Copyright 2018-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -120,9 +120,15 @@ public class DeadLetterPublishingRecoverer implements BiConsumer<ConsumerRecord<
 				record.key(), record.value(), headers);
 	}
 
-	private void publish(ProducerRecord<Object, Object> outRecord, KafkaOperations<Object, Object> template) {
+	/**
+	 * Override this if you want more than just logging of the send result.
+	 * @param outRecord the record to send.
+	 * @param kafkaTemplate the template.
+	 * @since 2.2.5
+	 */
+	protected void publish(ProducerRecord<Object, Object> outRecord, KafkaOperations<Object, Object> kafkaTemplate) {
 		try {
-			template.send(outRecord).addCallback(result -> {
+			kafkaTemplate.send(outRecord).addCallback(result -> {
 				if (logger.isDebugEnabled()) {
 					logger.debug("Successful dead-letter publication: " + result);
 				}
