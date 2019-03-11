@@ -115,6 +115,8 @@ import org.springframework.util.concurrent.ListenableFutureCallback;
 public class KafkaMessageListenerContainer<K, V> // NOSONAR comment density
 		extends AbstractMessageListenerContainer<K, V> {
 
+	private static final String UNUSED = "unused";
+
 	private static final int DEFAULT_ACK_TIME = 5000;
 
 	private final AbstractMessageListenerContainer<K, V> container;
@@ -695,7 +697,7 @@ public class KafkaMessageListenerContainer<K, V> // NOSONAR comment density
 				try {
 					pollAndInvoke();
 				}
-				catch (@SuppressWarnings("unused") WakeupException e) {
+				catch (@SuppressWarnings(UNUSED) WakeupException e) {
 					// Ignore, we're stopping
 				}
 				catch (NoOffsetForPartitionException nofpe) {
@@ -814,7 +816,7 @@ public class KafkaMessageListenerContainer<K, V> // NOSONAR comment density
 					try {
 						this.consumer.unsubscribe();
 					}
-					catch (@SuppressWarnings("unused") WakeupException e) {
+					catch (@SuppressWarnings(UNUSED) WakeupException e) {
 						// No-op. Continue process
 					}
 				}
@@ -900,7 +902,7 @@ public class KafkaMessageListenerContainer<K, V> // NOSONAR comment density
 					try {
 						ackImmediate(record);
 					}
-					catch (@SuppressWarnings("unused") WakeupException e) {
+					catch (@SuppressWarnings(UNUSED) WakeupException e) {
 						// ignore - not polling
 					}
 				}
@@ -1040,7 +1042,7 @@ public class KafkaMessageListenerContainer<K, V> // NOSONAR comment density
 					throw er;
 				}
 			}
-			catch (@SuppressWarnings("unused") InterruptedException e) {
+			catch (@SuppressWarnings(UNUSED) InterruptedException e) {
 				Thread.currentThread().interrupt();
 			}
 			return null;
@@ -1539,7 +1541,7 @@ public class KafkaMessageListenerContainer<K, V> // NOSONAR comment density
 						this.consumer.commitAsync(commits, this.commitCallback);
 					}
 				}
-				catch (@SuppressWarnings("unused") WakeupException e) {
+				catch (@SuppressWarnings(UNUSED) WakeupException e) {
 					// ignore - not polling
 					this.logger.debug("Woken up during commit");
 				}
