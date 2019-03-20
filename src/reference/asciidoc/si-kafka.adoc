@@ -8,10 +8,10 @@ This documentation pertains to versions 2.0.0 and above; for documentation for e
 Spring Integration Kafka is now based on the http://projects.spring.io/spring-kafka/[Spring for Apache Kafka project].
 It provides the following components:
 
-- Outbound Channel Adapter
-- Message-Driven Channel Adapter
-
-These are discussed in the following sections.
+* <<si-outbound>>
+* <<si-inbound>>
+* <<si-outbound-gateway>>
+* <<si-inbound-gateway>>
 
 [[si-outbound]]
 ==== Outbound Channel Adapter
