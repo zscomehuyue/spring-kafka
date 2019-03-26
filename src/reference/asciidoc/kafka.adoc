@@ -739,7 +739,7 @@ The framework cannot know whether such a message has been processed or not, that
 function.
 This is known as the https://www.enterpriseintegrationpatterns.com/patterns/messaging/IdempotentReceiver.html[Idempotent
 Receiver] pattern and Spring Integration provides an
-https://docs.spring.io/spring-integration/reference/html/messaging-endpoints-chapter.html#idempotent-receiver[implementation thereof].
+https://docs.spring.io/spring-integration/reference/html/#idempotent-receiver[implementation thereof].
 
 The Spring for Apache Kafka project also provides some assistance by means of the `FilteringMessageListenerAdapter`
 class, which can wrap your `MessageListener`.
