@@ -22,8 +22,7 @@ Sender applications can publish to Kafka by using Spring Integration messages, w
 * The payload of the Spring Integration message is used to populate the payload of the Kafka message.
 * By default, the `kafka_messageKey` header of the Spring Integration message is used to populate the key of the Kafka message.
 
-You can customize the target topic and partition for publishing the message through the `kafka_topic`
-and `kafka_partitionId` headers, respectively.
+You can customize the target topic and partition for publishing the message through the `kafka_topic` and `kafka_partitionId` headers, respectively.
 
 In addition, the `<int-kafka:outbound-channel-adapter>` provides the ability to extract the key, target topic, and target partition by applying SpEL expressions on the outbound message.
 To that end, it supports three mutually exclusive pairs of attributes:
@@ -34,18 +33,13 @@ To that end, it supports three mutually exclusive pairs of attributes:
 
 These let you specify `topic`, `message-key`, and `partition-id`, respectively, as static values on the adapter or to dynamically evaluate their values at runtime against the request message.
 
-IMPORTANT: The `KafkaHeaders` interface (provided by `spring-kafka`) contains constants used for interacting with
-headers.
+IMPORTANT: The `KafkaHeaders` interface (provided by `spring-kafka`) contains constants used for interacting with headers.
 The `messageKey` and `topic` default headers now require a `kafka_` prefix.
-When migrating from an earlier version that used the old headers, you need to specify
-`message-key-expression="headers['messageKey']"` and `topic-expression="headers['topic']"` on the
-`<int-kafka:outbound-channel-adapter>`.
-Alternatively, you can change the headers upstream to
-the new headers from `KafkaHeaders` by using a `<header-enricher>` or a `MessageBuilder`.
+When migrating from an earlier version that used the old headers, you need to specify `message-key-expression="headers['messageKey']"` and `topic-expression="headers['topic']"` on the `<int-kafka:outbound-channel-adapter>`.
+Alternatively, you can change the headers upstream to the new headers from `KafkaHeaders` by using a `<header-enricher>` or a `MessageBuilder`.
 If you use constant values, you can also configure them on the adapter by using `topic` and `message-key`.
 
-NOTE : If the adapter is configured with a topic or message key (either with a constant or expression), those are used
-and the corresponding header is ignored.
+NOTE : If the adapter is configured with a topic or message key (either with a constant or expression), those are used and the corresponding header is ignored.
 If you wish the header to override the configuration, you need to configure it in an expression, such as the following:
 
 ====

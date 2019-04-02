@@ -19,7 +19,7 @@ See <<serdes>> for more information.
 
 ==== Container Stopping Error Handlers
 
-Container error handlers are now provided for both record and batch listeners that treat any exceptions thrown by the listener as fatal/
+Container error handlers are now provided for both record and batch listeners that treat any exceptions thrown by the listener as fatal.
 They stop the container.
 See <<annotation-error-handling>> for more information.
 
