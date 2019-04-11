@@ -472,19 +472,23 @@ public class KafkaMessageListenerContainer<K, V> extends AbstractMessageListener
 
 				@Override
 				public void onPartitionsRevoked(Collection<TopicPartition> partitions) {
-					if (this.consumerAwareListener != null) {
-						this.consumerAwareListener.onPartitionsRevokedBeforeCommit(consumer, partitions);
+					try {
+						if (this.consumerAwareListener != null) {
+							this.consumerAwareListener.onPartitionsRevokedBeforeCommit(consumer, partitions);
+						}
+						else {
+							this.userListener.onPartitionsRevoked(partitions);
+						}
+						// Wait until now to commit, in case the user listener added acks
+						commitPendingAcks();
+						if (this.consumerAwareListener != null) {
+							this.consumerAwareListener.onPartitionsRevokedAfterCommit(consumer, partitions);
+						}
 					}
-					else {
-						this.userListener.onPartitionsRevoked(partitions);
-					}
-					// Wait until now to commit, in case the user listener added acks
-					commitPendingAcks();
-					if (this.consumerAwareListener != null) {
-						this.consumerAwareListener.onPartitionsRevokedAfterCommit(consumer, partitions);
-					}
-					if (ListenerConsumer.this.kafkaTxManager != null) {
-						closeProducers(partitions);
+					finally {
+						if (ListenerConsumer.this.kafkaTxManager != null) {
+							closeProducers(partitions);
+						}
 					}
 				}
 
