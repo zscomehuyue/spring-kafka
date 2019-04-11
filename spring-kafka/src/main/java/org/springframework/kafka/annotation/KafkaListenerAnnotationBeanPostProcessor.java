@@ -277,14 +277,9 @@ public class KafkaListenerAnnotationBeanPostProcessor<K, V>
 			final boolean hasClassLevelListeners = classLevelListeners.size() > 0;
 			final List<Method> multiMethods = new ArrayList<>();
 			Map<Method, Set<KafkaListener>> annotatedMethods = MethodIntrospector.selectMethods(targetClass,
-					new MethodIntrospector.MetadataLookup<Set<KafkaListener>>() {
-
-						@Override
-						public Set<KafkaListener> inspect(Method method) {
-							Set<KafkaListener> listenerMethods = findListenerAnnotations(method);
-							return (!listenerMethods.isEmpty() ? listenerMethods : null);
-						}
-
+					(MethodIntrospector.MetadataLookup<Set<KafkaListener>>) method -> {
+						Set<KafkaListener> listenerMethods = findListenerAnnotations(method);
+						return (!listenerMethods.isEmpty() ? listenerMethods : null);
 					});
 			if (hasClassLevelListeners) {
 				Set<Method> methodsWithHandler = MethodIntrospector.selectMethods(targetClass,
@@ -427,8 +422,7 @@ public class KafkaListenerAnnotationBeanPostProcessor<K, V>
 		endpoint.setTopicPartitions(resolveTopicPartitions(kafkaListener));
 		endpoint.setTopics(resolveTopics(kafkaListener));
 		endpoint.setTopicPattern(resolvePattern(kafkaListener));
-		endpoint.setClientIdPrefix(resolveExpressionAsString(kafkaListener.clientIdPrefix(),
-				"clientIdPrefix"));
+		endpoint.setClientIdPrefix(resolveExpressionAsString(kafkaListener.clientIdPrefix(), "clientIdPrefix"));
 		String group = kafkaListener.containerGroup();
 		if (StringUtils.hasText(group)) {
 			Object resolvedGroup = resolveExpression(group);
@@ -475,11 +469,14 @@ public class KafkaListenerAnnotationBeanPostProcessor<K, V>
 		if (propertyStrings.length > 0) {
 			Properties properties = new Properties();
 			for (String property : propertyStrings) {
-				try {
-					properties.load(new StringReader(resolveExpressionAsString(property, "property")));
-				}
-				catch (IOException e) {
-					this.logger.error("Failed to load property " + property + ", continuing...", e);
+				String value = resolveExpressionAsString(property, "property");
+				if (value != null) {
+					try {
+						properties.load(new StringReader(value));
+					}
+					catch (IOException e) {
+						this.logger.error("Failed to load property " + property + ", continuing...", e);
+					}
 				}
 			}
 			endpoint.setConsumerProperties(properties);
@@ -488,7 +485,7 @@ public class KafkaListenerAnnotationBeanPostProcessor<K, V>
 
 	private String getEndpointId(KafkaListener kafkaListener) {
 		if (StringUtils.hasText(kafkaListener.id())) {
-			return resolve(kafkaListener.id());
+			return resolveExpressionAsString(kafkaListener.id(), "id");
 		}
 		else {
 			return GENERATED_ID_PREFIX + this.counter.getAndIncrement();
@@ -514,19 +511,19 @@ public class KafkaListenerAnnotationBeanPostProcessor<K, V>
 				result.addAll(resolveTopicPartitionsList(topicPartition));
 			}
 		}
-		return result.toArray(new TopicPartitionInitialOffset[result.size()]);
+		return result.toArray(new TopicPartitionInitialOffset[0]);
 	}
 
 	private String[] resolveTopics(KafkaListener kafkaListener) {
 		String[] topics = kafkaListener.topics();
 		List<String> result = new ArrayList<>();
 		if (topics.length > 0) {
-			for (int i = 0; i < topics.length; i++) {
-				Object topic = resolveExpression(topics[i]);
+			for (String topic1 : topics) {
+				Object topic = resolveExpression(topic1);
 				resolveAsString(topic, result);
 			}
 		}
-		return result.toArray(new String[result.size()]);
+		return result.toArray(new String[0]);
 	}
 
 	private Pattern resolvePattern(KafkaListener kafkaListener) {
@@ -558,8 +555,8 @@ public class KafkaListenerAnnotationBeanPostProcessor<K, V>
 		Assert.state(partitions.length > 0 || partitionOffsets.length > 0,
 				"At least one 'partition' or 'partitionOffset' required in @TopicPartition for topic '" + topic + "'");
 		List<TopicPartitionInitialOffset> result = new ArrayList<>();
-		for (int i = 0; i < partitions.length; i++) {
-			resolvePartitionAsInteger((String) topic, resolveExpression(partitions[i]), result);
+		for (String partition : partitions) {
+			resolvePartitionAsInteger((String) topic, resolveExpression(partition), result);
 		}
 
 		for (PartitionOffset partitionOffset : partitionOffsets) {
