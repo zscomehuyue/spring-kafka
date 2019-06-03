@@ -1885,7 +1885,7 @@ public class KafkaMessageListenerContainerTests {
 			}
 			return first.getAndSet(false) ? consumerRecords : emptyRecords;
 		});
-		final CountDownLatch commitLatch = new CountDownLatch(2);
+		final CountDownLatch commitLatch = new CountDownLatch(3);
 		willAnswer(i -> {
 			commitLatch.countDown();
 			return null;
@@ -1934,7 +1934,7 @@ public class KafkaMessageListenerContainerTests {
 		});
 		container.start();
 		assertThat(commitLatch.await(10, TimeUnit.SECONDS)).isTrue();
-		verify(consumer, atLeast(3)).commitSync(anyMap());
+		verify(consumer, times(3)).commitSync(anyMap());
 		assertThat(container.isContainerPaused()).isFalse();
 		container.pause();
 		assertThat(container.isPaused()).isTrue();
