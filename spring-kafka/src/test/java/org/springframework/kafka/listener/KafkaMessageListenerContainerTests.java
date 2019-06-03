@@ -1863,7 +1863,10 @@ public class KafkaMessageListenerContainerTests {
 	public void testPauseResume() throws Exception {
 		ConsumerFactory<Integer, String> cf = mock(ConsumerFactory.class);
 		Consumer<Integer, String> consumer = mock(Consumer.class);
-		given(cf.createConsumer(eq("grp"), eq("clientId"), isNull(), isNull())).willReturn(consumer);
+		given(cf.createConsumer(eq("grp"), eq("clientId"), isNull(), any())).willReturn(consumer);
+		Map<String, Object> cfProps = new HashMap<>();
+		cfProps.put(ConsumerConfig.DEFAULT_API_TIMEOUT_MS_CONFIG, 45000);
+		given(cf.getConfigurationProperties()).willReturn(cfProps);
 		final Map<TopicPartition, List<ConsumerRecord<Integer, String>>> records = new HashMap<>();
 		records.put(new TopicPartition("foo", 0), Arrays.asList(
 				new ConsumerRecord<>("foo", 0, 0L, 1, "foo"),
@@ -1871,8 +1874,14 @@ public class KafkaMessageListenerContainerTests {
 		ConsumerRecords<Integer, String> consumerRecords = new ConsumerRecords<>(records);
 		ConsumerRecords<Integer, String> emptyRecords = new ConsumerRecords<>(Collections.emptyMap());
 		AtomicBoolean first = new AtomicBoolean(true);
+		AtomicBoolean rebalance = new AtomicBoolean(true);
+		AtomicReference<ConsumerRebalanceListener> rebal = new AtomicReference<>();
 		given(consumer.poll(any(Duration.class))).willAnswer(i -> {
 			Thread.sleep(50);
+			if (rebalance.getAndSet(false)) {
+				rebal.get().onPartitionsRevoked(Collections.emptyList());
+				rebal.get().onPartitionsAssigned(records.keySet());
+			}
 			return first.getAndSet(false) ? consumerRecords : emptyRecords;
 		});
 		final CountDownLatch commitLatch = new CountDownLatch(2);
@@ -1881,9 +1890,11 @@ public class KafkaMessageListenerContainerTests {
 			return null;
 		}).given(consumer).commitSync(any(Map.class));
 		given(consumer.assignment()).willReturn(records.keySet());
-		final CountDownLatch pauseLatch = new CountDownLatch(2);
+		final CountDownLatch pauseLatch1 = new CountDownLatch(2); // consumer, event publisher
+		final CountDownLatch pauseLatch2 = new CountDownLatch(2); // consumer, consumer
 		willAnswer(i -> {
-			pauseLatch.countDown();
+			pauseLatch1.countDown();
+			pauseLatch2.countDown();
 			return null;
 		}).given(consumer).pause(records.keySet());
 		given(consumer.paused()).willReturn(records.keySet());
@@ -1892,20 +1903,26 @@ public class KafkaMessageListenerContainerTests {
 			resumeLatch.countDown();
 			return null;
 		}).given(consumer).resume(records.keySet());
-		TopicPartitionInitialOffset[] topicPartition = new TopicPartitionInitialOffset[] {
-				new TopicPartitionInitialOffset("foo", 0) };
-		ContainerProperties containerProps = new ContainerProperties(topicPartition);
+		willAnswer(invoc -> {
+			rebal.set(invoc.getArgument(1));
+			return null;
+		}).given(consumer).subscribe(any(Collection.class), any(ConsumerRebalanceListener.class));
+		ContainerProperties containerProps = new ContainerProperties("foo");
 		containerProps.setGroupId("grp");
 		containerProps.setAckMode(AckMode.RECORD);
 		containerProps.setClientId("clientId");
 		containerProps.setIdleEventInterval(100L);
 		containerProps.setMessageListener((MessageListener) r -> { });
+		containerProps.setMissingTopicsFatal(false);
+		Properties consumerProps = new Properties();
+		consumerProps.setProperty(ConsumerConfig.DEFAULT_API_TIMEOUT_MS_CONFIG, "42000");
+		containerProps.setConsumerProperties(consumerProps);
 		KafkaMessageListenerContainer<Integer, String> container =
 				new KafkaMessageListenerContainer<>(cf, containerProps);
 		CountDownLatch stopLatch = new CountDownLatch(1);
 		container.setApplicationEventPublisher(e -> {
 			if (e instanceof ConsumerPausedEvent) {
-				pauseLatch.countDown();
+				pauseLatch1.countDown();
 			}
 			else if (e instanceof ConsumerResumedEvent) {
 				resumeLatch.countDown();
@@ -1916,13 +1933,19 @@ public class KafkaMessageListenerContainerTests {
 		});
 		container.start();
 		assertThat(commitLatch.await(10, TimeUnit.SECONDS)).isTrue();
-		verify(consumer, times(2)).commitSync(any(Map.class));
+		verify(consumer, times(3)).commitSync(anyMap());
+		assertThat(container.isContainerPaused()).isFalse();
 		container.pause();
-		assertThat(pauseLatch.await(10, TimeUnit.SECONDS)).isTrue();
+		assertThat(container.isPaused()).isTrue();
+		assertThat(pauseLatch1.await(10, TimeUnit.SECONDS)).isTrue();
+		assertThat(container.isContainerPaused()).isTrue();
+		rebalance.set(true); // force a re-pause
+		assertThat(pauseLatch2.await(10, TimeUnit.SECONDS)).isTrue();
 		container.resume();
 		assertThat(resumeLatch.await(10, TimeUnit.SECONDS)).isTrue();
 		container.stop();
 		assertThat(stopLatch.await(10, TimeUnit.SECONDS)).isTrue();
+		verify(consumer, times(4)).commitSync(anyMap());
 	}
 
 	@SuppressWarnings({ "unchecked", "rawtypes" })
