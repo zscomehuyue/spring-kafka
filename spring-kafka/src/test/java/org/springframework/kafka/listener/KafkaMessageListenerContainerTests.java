@@ -23,6 +23,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willAnswer;
+import static org.mockito.Mockito.atLeast;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
@@ -1933,7 +1934,7 @@ public class KafkaMessageListenerContainerTests {
 		});
 		container.start();
 		assertThat(commitLatch.await(10, TimeUnit.SECONDS)).isTrue();
-		verify(consumer, times(3)).commitSync(anyMap());
+		verify(consumer, atLeast(3)).commitSync(anyMap());
 		assertThat(container.isContainerPaused()).isFalse();
 		container.pause();
 		assertThat(container.isPaused()).isTrue();
@@ -1945,7 +1946,7 @@ public class KafkaMessageListenerContainerTests {
 		assertThat(resumeLatch.await(10, TimeUnit.SECONDS)).isTrue();
 		container.stop();
 		assertThat(stopLatch.await(10, TimeUnit.SECONDS)).isTrue();
-		verify(consumer, times(4)).commitSync(anyMap());
+		verify(consumer, atLeast(4)).commitSync(anyMap());
 	}
 
 	@SuppressWarnings({ "unchecked", "rawtypes" })
