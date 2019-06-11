@@ -81,6 +81,8 @@ public abstract class AbstractMessageListenerContainer<K, V>
 	private AfterRollbackProcessor<? super K, ? super V> afterRollbackProcessor =
 			new DefaultAfterRollbackProcessor<>();
 
+	private RecordInterceptor<K, V> recordInterceptor;
+
 	private volatile boolean running = false;
 
 	private volatile boolean paused;
@@ -259,6 +261,20 @@ public abstract class AbstractMessageListenerContainer<K, V>
 	@Nullable
 	public String getListenerId() {
 		return this.beanName; // the container factory sets the bean name to the id attribute
+	}
+
+	protected RecordInterceptor<K, V> getRecordInterceptor() {
+		return this.recordInterceptor;
+	}
+
+	/**
+	 * Set an interceptor to be called before calling the listener.
+	 * Does not apply to batch listeners.
+	 * @param recordInterceptor the interceptor.
+	 * @since 2.2.7
+	 */
+	public void setRecordInterceptor(RecordInterceptor<K, V> recordInterceptor) {
+		this.recordInterceptor = recordInterceptor;
 	}
 
 	@Override
