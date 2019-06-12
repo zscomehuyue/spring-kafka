@@ -22,30 +22,33 @@ import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerRecord;
-import org.junit.jupiter.api.Test;
+import org.junit.ClassRule;
+import org.junit.Test;
 
-import org.springframework.kafka.test.EmbeddedKafkaBroker;
-import org.springframework.kafka.test.context.EmbeddedKafka;
+import org.springframework.kafka.test.rule.EmbeddedKafkaRule;
 
 /**
  * @author Gary Russell
  * @since 2.2.7
  *
  */
-@EmbeddedKafka(topics = { "singleTopic1", "singleTopic2" })
 public class KafkaTestUtilsTests {
 
+	@ClassRule
+	public static EmbeddedKafkaRule broker = new EmbeddedKafkaRule(1, true, 1, "singleTopic1", "singleTopic2");
+
 	@Test
-	void testGetSingleWithMoreThatOneTopic(EmbeddedKafkaBroker broker) {
-		Map<String, Object> producerProps = KafkaTestUtils.producerProps(broker);
+	public void testGetSingleWithMoreThatOneTopic() {
+		Map<String, Object> producerProps = KafkaTestUtils.producerProps(broker.getEmbeddedKafka());
 		KafkaProducer<Integer, String> producer = new KafkaProducer<>(producerProps);
 		producer.send(new ProducerRecord<>("singleTopic1", 1, "foo"));
 		producer.send(new ProducerRecord<>("singleTopic2", 1, "foo"));
 		producer.close();
-		Map<String, Object> consumerProps = KafkaTestUtils.consumerProps("ktuTests", "false", broker);
+		Map<String, Object> consumerProps = KafkaTestUtils.consumerProps("ktuTests", "false",
+				broker.getEmbeddedKafka());
 		consumerProps.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
 		KafkaConsumer<Integer, String> consumer = new KafkaConsumer<>(consumerProps);
-		broker.consumeFromAllEmbeddedTopics(consumer);
+		broker.getEmbeddedKafka().consumeFromAllEmbeddedTopics(consumer);
 		KafkaTestUtils.getSingleRecord(consumer, "singleTopic1");
 		KafkaTestUtils.getSingleRecord(consumer, "singleTopic2");
 		consumer.close();
