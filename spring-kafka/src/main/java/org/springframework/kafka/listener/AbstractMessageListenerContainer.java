@@ -264,6 +264,9 @@ public abstract class AbstractMessageListenerContainer<K, V>
 			if (isRunning()) {
 				doStop(callback);
 			}
+			else {
+				callback.run();
+			}
 		}
 	}
 
