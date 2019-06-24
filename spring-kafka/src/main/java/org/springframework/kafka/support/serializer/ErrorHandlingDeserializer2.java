@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.io.ObjectOutputStream;
 import java.util.Map;
 import java.util.function.BiFunction;
+import java.util.function.Function;
 
 import org.apache.kafka.common.header.Headers;
 import org.apache.kafka.common.header.internals.RecordHeader;
@@ -38,6 +39,7 @@ import org.springframework.util.ClassUtils;
  *
  * @author Gary Russell
  * @author Artem Bilan
+ * @author Victor Perez Rey
  *
  * @since 2.2
  *
@@ -83,7 +85,7 @@ public class ErrorHandlingDeserializer2<T> implements ExtendedDeserializer<T> {
 
 	private boolean isKey;
 
-	private BiFunction<byte[], Headers, T> failedDeserializationFunction;
+	private Function<FailedDeserializationInfo, T> failedDeserializationFunction;
 
 	public ErrorHandlingDeserializer2() {
 		super();
@@ -93,7 +95,23 @@ public class ErrorHandlingDeserializer2<T> implements ExtendedDeserializer<T> {
 		this.delegate = setupDelegate(delegate);
 	}
 
+	/**
+	 * Provide an alternative supplying mechanism when deserialization fails.
+	 * @param failedDeserializationFunction the {@link BiFunction} to use.
+	 * @deprecated since 2.2.8 in favor of {@link #setFailedDeserializationFunction(Function)}.
+	 */
+	@Deprecated
 	public void setFailedDeserializationFunction(BiFunction<byte[], Headers, T> failedDeserializationFunction) {
+		setFailedDeserializationFunction((failed) ->
+				failedDeserializationFunction.apply(failed.getData(), failed.getHeaders()));
+	}
+
+	/**
+	 * Provide an alternative supplying mechanism when deserialization fails.
+	 * @param failedDeserializationFunction the {@link Function} to use.
+	 * @since 2.2.8
+	 */
+	public void setFailedDeserializationFunction(Function<FailedDeserializationInfo, T> failedDeserializationFunction) {
 		this.failedDeserializationFunction = failedDeserializationFunction;
 	}
 
@@ -159,9 +177,9 @@ public class ErrorHandlingDeserializer2<T> implements ExtendedDeserializer<T> {
 			try {
 				Object value = configs.get(configKey);
 				Class<?> clazz = value instanceof Class ? (Class<?>) value : ClassUtils.forName((String) value, null);
-				Assert.isTrue(BiFunction.class.isAssignableFrom(clazz), "'function' must be a 'BiFunction	', not a "
+				Assert.isTrue(Function.class.isAssignableFrom(clazz), "'function' must be a 'Function ', not a "
 						+ clazz.getName());
-				this.failedDeserializationFunction = (BiFunction<byte[], Headers, T>) clazz.newInstance();
+				this.failedDeserializationFunction = (Function<FailedDeserializationInfo, T>) clazz.newInstance();
 			}
 			catch (ClassNotFoundException | LinkageError | InstantiationException | IllegalAccessException e) {
 				throw new IllegalStateException(e);
@@ -175,9 +193,7 @@ public class ErrorHandlingDeserializer2<T> implements ExtendedDeserializer<T> {
 			return this.delegate.deserialize(topic, data);
 		}
 		catch (Exception e) {
-			return this.failedDeserializationFunction != null
-					? this.failedDeserializationFunction.apply(data, null)
-					: null;
+			return recoverFromSupplier(topic, null, data, e);
 		}
 	}
 
@@ -188,9 +204,18 @@ public class ErrorHandlingDeserializer2<T> implements ExtendedDeserializer<T> {
 		}
 		catch (Exception e) {
 			deserializationException(headers, data, e);
-			return this.failedDeserializationFunction != null
-					? this.failedDeserializationFunction.apply(data, headers)
-					: null;
+			return recoverFromSupplier(topic, headers, data, e);
+		}
+	}
+
+	private T recoverFromSupplier(String topic, Headers headers, byte[] data, Exception exception) {
+		if (this.failedDeserializationFunction != null) {
+			FailedDeserializationInfo failedDeserializationInfo =
+					new FailedDeserializationInfo(topic, headers, data, this.isForKey, exception);
+			return this.failedDeserializationFunction.apply(failedDeserializationInfo);
+		}
+		else {
+			return null;
 		}
 	}
 
@@ -210,8 +235,8 @@ public class ErrorHandlingDeserializer2<T> implements ExtendedDeserializer<T> {
 			try (ObjectOutputStream oos = new ObjectOutputStream(stream)) {
 				exception = new DeserializationException("failed to deserialize",
 						data, this.isKey, new RuntimeException("Could not deserialize type "
-								+ e.getClass().getName() + " with message " + e.getMessage()
-								+ " failure: " + ex.getMessage()));
+						+ e.getClass().getName() + " with message " + e.getMessage()
+						+ " failure: " + ex.getMessage()));
 				oos.writeObject(exception);
 			}
 			catch (IOException ex2) {
