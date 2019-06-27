@@ -211,7 +211,7 @@ public class ErrorHandlingDeserializer2<T> implements ExtendedDeserializer<T> {
 	private T recoverFromSupplier(String topic, Headers headers, byte[] data, Exception exception) {
 		if (this.failedDeserializationFunction != null) {
 			FailedDeserializationInfo failedDeserializationInfo =
-					new FailedDeserializationInfo(topic, headers, data, this.isForKey, exception);
+					new FailedDeserializationInfo(topic, headers, data, this.isKey, exception);
 			return this.failedDeserializationFunction.apply(failedDeserializationInfo);
 		}
 		else {
