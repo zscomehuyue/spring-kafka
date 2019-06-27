@@ -566,7 +566,7 @@ public class KafkaMessageListenerContainer<K, V> extends AbstractMessageListener
 			};
 		}
 
-		private void seekPartitions(@Nullable Collection<TopicPartition> partitions, boolean idle) {
+		private void seekPartitions(Collection<TopicPartition> partitions, boolean idle) {
 			if (partitions == null) {
 				return;
 			}
