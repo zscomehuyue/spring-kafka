@@ -370,6 +370,7 @@ public class KafkaTemplate<K, V> implements KafkaOperations<K, V> {
 	 * TODO 3.消费者，使用消费组，避免多线程导致顺序问题；
 	 *
 	 * TODO 1.producer处理了网络错误，重新发送的问题；
+	 * TODO 1.内存积累器，被kill掉，消息还没有发送出去；改种情况如何处理；如何解决？
 	 *
 	 *
 	 * Send the producer record.
