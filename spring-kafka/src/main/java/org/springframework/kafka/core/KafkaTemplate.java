@@ -16,9 +16,6 @@
 
 package org.springframework.kafka.core;
 
-import java.util.List;
-import java.util.Map;
-
 import org.apache.commons.logging.LogFactory;
 import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.apache.kafka.clients.producer.Callback;
@@ -28,14 +25,8 @@ import org.apache.kafka.common.Metric;
 import org.apache.kafka.common.MetricName;
 import org.apache.kafka.common.PartitionInfo;
 import org.apache.kafka.common.TopicPartition;
-
 import org.springframework.core.log.LogAccessor;
-import org.springframework.kafka.support.KafkaHeaders;
-import org.springframework.kafka.support.KafkaUtils;
-import org.springframework.kafka.support.LoggingProducerListener;
-import org.springframework.kafka.support.ProducerListener;
-import org.springframework.kafka.support.SendResult;
-import org.springframework.kafka.support.TransactionSupport;
+import org.springframework.kafka.support.*;
 import org.springframework.kafka.support.converter.MessageConverter;
 import org.springframework.kafka.support.converter.MessagingMessageConverter;
 import org.springframework.kafka.support.converter.RecordMessageConverter;
@@ -45,6 +36,9 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 import org.springframework.util.Assert;
 import org.springframework.util.concurrent.ListenableFuture;
 import org.springframework.util.concurrent.SettableListenableFuture;
+
+import java.util.List;
+import java.util.Map;
 
 
 /**
@@ -370,6 +364,14 @@ public class KafkaTemplate<K, V> implements KafkaOperations<K, V> {
 	}
 
 	/**
+	 * TODO kafka如果保证顺序性；
+	 * TODO 1.同步发送
+	 * TODO 2.partion为1个（partion再次平衡时，避免导致乱顺序，如果某一个分区没有消费完，就会导致顺序问题）
+	 * TODO 3.消费者，使用消费组，避免多线程导致顺序问题；
+	 *
+	 * TODO 1.producer处理了网络错误，重新发送的问题；
+	 *
+	 *
 	 * Send the producer record.
 	 * @param producerRecord the producer record.
 	 * @return a Future for the {@link org.apache.kafka.clients.producer.RecordMetadata
