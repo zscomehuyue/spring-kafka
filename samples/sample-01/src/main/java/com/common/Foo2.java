@@ -16,34 +16,60 @@
 
 package com.common;
 
+import org.apache.kafka.common.utils.ByteBufferOutputStream;
+
+import java.nio.ByteBuffer;
+import java.nio.MappedByteBuffer;
+
 /**
  * @author Gary Russell
  * @since 2.2.1
- *
  */
 public class Foo2 {
 
-	private String foo;
+    private String foo;
+    private Person person;
 
-	public Foo2() {
-		super();
-	}
+    public Foo2(Person person) {
+        this.person = person;
+    }
 
-	public Foo2(String foo) {
-		this.foo = foo;
-	}
+    public Foo2() {
+        super();
+    }
 
-	public String getFoo() {
-		return this.foo;
-	}
+    public Foo2(String foo) {
+        this.foo = foo;
+    }
 
-	public void setFoo(String foo) {
-		this.foo = foo;
-	}
+    public Person getPerson() {
+        return person;
+    }
 
-	@Override
-	public String toString() {
-		return "Foo2 [foo=" + this.foo + "]";
-	}
+    public String getFoo() {
+        return this.foo;
+    }
 
+    public void setFoo(String foo) {
+        this.foo = foo;
+    }
+
+    @Override
+    public String toString() {
+        return "Foo2 [foo=" + this.foo + "]";
+    }
+
+    public static void main(String[] args) {
+        ByteBuffer buffer = MappedByteBuffer.wrap("9999990".getBytes());
+        ByteBufferOutputStream stream = new ByteBufferOutputStream(buffer);
+        buffer.clear();
+        buffer = null;
+
+        Person person = new Person();
+        Foo2 f2 = new Foo2(person);
+        person = null;
+        System.out.println("==" + f2.getPerson());
+        System.out.println(new String(stream.buffer().array()));
+
+    }
 }

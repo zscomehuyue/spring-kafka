@@ -46,7 +46,6 @@ import java.util.Map;
  *
  * @param <K> the key type.
  * @param <V> the value type.
- *
  * @author Marius Bogoevici
  * @author Gary Russell
  * @author Igor Stepanov
@@ -77,6 +76,7 @@ public class KafkaTemplate<K, V> implements KafkaOperations<K, V> {
 
 	/**
 	 * Create an instance using the supplied producer factory and autoFlush false.
+	 *
 	 * @param producerFactory the producer factory.
 	 */
 	public KafkaTemplate(ProducerFactory<K, V> producerFactory) {
@@ -90,8 +90,9 @@ public class KafkaTemplate<K, V> implements KafkaOperations<K, V> {
 	 * {@code linger.ms} to a non-default value and wish send operations on this template
 	 * to occur immediately, regardless of that setting, or if you wish to block until the
 	 * broker has acknowledged receipt according to the producer's {@code acks} property.
+	 *
 	 * @param producerFactory the producer factory.
-	 * @param autoFlush true to flush after each send.
+	 * @param autoFlush       true to flush after each send.
 	 * @see Producer#flush()
 	 */
 	public KafkaTemplate(ProducerFactory<K, V> producerFactory, boolean autoFlush) {
@@ -103,6 +104,7 @@ public class KafkaTemplate<K, V> implements KafkaOperations<K, V> {
 	/**
 	 * The default topic for send methods where a topic is not
 	 * provided.
+	 *
 	 * @return the topic.
 	 */
 	public String getDefaultTopic() {
@@ -112,6 +114,7 @@ public class KafkaTemplate<K, V> implements KafkaOperations<K, V> {
 	/**
 	 * Set the default topic for send methods where a topic is not
 	 * provided.
+	 *
 	 * @param defaultTopic the topic.
 	 */
 	public void setDefaultTopic(String defaultTopic) {
@@ -122,6 +125,7 @@ public class KafkaTemplate<K, V> implements KafkaOperations<K, V> {
 	 * Set a {@link ProducerListener} which will be invoked when Kafka acknowledges
 	 * a send operation. By default a {@link LoggingProducerListener} is configured
 	 * which logs errors only.
+	 *
 	 * @param producerListener the listener; may be {@code null}.
 	 */
 	public void setProducerListener(@Nullable ProducerListener<K, V> producerListener) {
@@ -130,6 +134,7 @@ public class KafkaTemplate<K, V> implements KafkaOperations<K, V> {
 
 	/**
 	 * Return the message converter.
+	 *
 	 * @return the message converter.
 	 */
 	public MessageConverter getMessageConverter() {
@@ -138,6 +143,7 @@ public class KafkaTemplate<K, V> implements KafkaOperations<K, V> {
 
 	/**
 	 * Set the message converter to use.
+	 *
 	 * @param messageConverter the message converter.
 	 */
 	public void setMessageConverter(RecordMessageConverter messageConverter) {
@@ -156,6 +162,7 @@ public class KafkaTemplate<K, V> implements KafkaOperations<K, V> {
 
 	/**
 	 * Set a transaction id prefix to override the prefix in the producer factory.
+	 *
 	 * @param transactionIdPrefix the prefix.
 	 * @since 2.3
 	 */
@@ -165,6 +172,7 @@ public class KafkaTemplate<K, V> implements KafkaOperations<K, V> {
 
 	/**
 	 * Return the producer factory used by this template.
+	 *
 	 * @return the factory.
 	 * @since 2.2.5
 	 */
@@ -212,7 +220,7 @@ public class KafkaTemplate<K, V> implements KafkaOperations<K, V> {
 
 	@Override
 	public ListenableFuture<SendResult<K, V>> send(String topic, Integer partition, Long timestamp, K key,
-			@Nullable V data) {
+												   @Nullable V data) {
 
 		ProducerRecord<K, V> producerRecord = new ProducerRecord<>(topic, partition, timestamp, key, data);
 		return doSend(producerRecord);
@@ -242,8 +250,7 @@ public class KafkaTemplate<K, V> implements KafkaOperations<K, V> {
 		Producer<K, V> producer = getTheProducer();
 		try {
 			return producer.partitionsFor(topic);
-		}
-		finally {
+		} finally {
 			closeProducer(producer, inTransaction());
 		}
 	}
@@ -253,8 +260,7 @@ public class KafkaTemplate<K, V> implements KafkaOperations<K, V> {
 		Producer<K, V> producer = getTheProducer();
 		try {
 			return producer.metrics();
-		}
-		finally {
+		} finally {
 			closeProducer(producer, inTransaction());
 		}
 	}
@@ -265,8 +271,7 @@ public class KafkaTemplate<K, V> implements KafkaOperations<K, V> {
 		Producer<K, V> producer = getTheProducer();
 		try {
 			return callback.doInKafka(producer);
-		}
-		finally {
+		} finally {
 			closeProducer(producer, inTransaction());
 		}
 	}
@@ -281,8 +286,7 @@ public class KafkaTemplate<K, V> implements KafkaOperations<K, V> {
 		if (this.producerFactory.isProducerPerConsumerPartition()) {
 			transactionIdSuffix = TransactionSupport.getTransactionIdSuffix();
 			TransactionSupport.clearTransactionIdSuffix();
-		}
-		else {
+		} else {
 			transactionIdSuffix = null;
 		}
 
@@ -290,8 +294,7 @@ public class KafkaTemplate<K, V> implements KafkaOperations<K, V> {
 
 		try {
 			producer.beginTransaction();
-		}
-		catch (Exception e) {
+		} catch (Exception e) {
 			closeProducer(producer, false);
 			throw e;
 		}
@@ -301,20 +304,16 @@ public class KafkaTemplate<K, V> implements KafkaOperations<K, V> {
 			T result = callback.doInOperations(this);
 			try {
 				producer.commitTransaction();
-			}
-			catch (Exception e) {
+			} catch (Exception e) {
 				throw new SkipAbortException(e);
 			}
 			return result;
-		}
-		catch (SkipAbortException e) { // NOSONAR - exception flow control
+		} catch (SkipAbortException e) { // NOSONAR - exception flow control
 			throw ((RuntimeException) e.getCause()); // NOSONAR - lost stack trace
-		}
-		catch (Exception e) {
+		} catch (Exception e) {
 			producer.abortTransaction();
 			throw e;
-		}
-		finally {
+		} finally {
 			if (transactionIdSuffix != null) {
 				TransactionSupport.setTransactionIdSuffix(transactionIdSuffix);
 			}
@@ -334,8 +333,7 @@ public class KafkaTemplate<K, V> implements KafkaOperations<K, V> {
 		Producer<K, V> producer = getTheProducer();
 		try {
 			producer.flush();
-		}
-		finally {
+		} finally {
 			closeProducer(producer, inTransaction());
 		}
 	}
@@ -368,12 +366,15 @@ public class KafkaTemplate<K, V> implements KafkaOperations<K, V> {
 	 * TODO 1.同步发送
 	 * TODO 2.partion为1个（partion再次平衡时，避免导致乱顺序，如果某一个分区没有消费完，就会导致顺序问题）
 	 * TODO 3.消费者，使用消费组，避免多线程导致顺序问题；
-	 *
+	 * <p>
 	 * TODO 1.producer处理了网络错误，重新发送的问题；
-	 * TODO 1.内存积累器，被kill掉，消息还没有发送出去；改种情况如何处理；如何解决？
-	 *
-	 *
+	 * <p>
+	 * TODO 异步存在消息丢失情况
+	 * todo 1.内存积累器，被kill掉，消息还没有发送出去；改种情况如何处理；如何解决？
+	 * <p>
+	 * <p>
 	 * Send the producer record.
+	 *
 	 * @param producerRecord the producer record.
 	 * @return a Future for the {@link org.apache.kafka.clients.producer.RecordMetadata
 	 * RecordMetadata}.
@@ -382,10 +383,10 @@ public class KafkaTemplate<K, V> implements KafkaOperations<K, V> {
 		if (this.transactional) {
 			Assert.state(inTransaction(),
 					"No transaction is in process; "
-						+ "possible solutions: run the template operation within the scope of a "
-						+ "template.executeInTransaction() operation, start a transaction with @Transactional "
-						+ "before invoking the template method, "
-						+ "run in a transaction started by a listener container when consuming a record");
+							+ "possible solutions: run the template operation within the scope of a "
+							+ "template.executeInTransaction() operation, start a transaction with @Transactional "
+							+ "before invoking the template method, "
+							+ "run in a transaction started by a listener container when consuming a record");
 		}
 		final Producer<K, V> producer = getTheProducer();
 		this.logger.trace(() -> "Sending: " + producerRecord);
@@ -399,7 +400,7 @@ public class KafkaTemplate<K, V> implements KafkaOperations<K, V> {
 	}
 
 	private Callback buildCallback(final ProducerRecord<K, V> producerRecord, final Producer<K, V> producer,
-			final SettableListenableFuture<SendResult<K, V>> future) {
+								   final SettableListenableFuture<SendResult<K, V>> future) {
 		return (metadata, exception) -> {
 			try {
 				if (exception == null) {
@@ -408,16 +409,14 @@ public class KafkaTemplate<K, V> implements KafkaOperations<K, V> {
 						KafkaTemplate.this.producerListener.onSuccess(producerRecord, metadata);
 					}
 					KafkaTemplate.this.logger.trace(() -> "Sent ok: " + producerRecord + ", metadata: " + metadata);
-				}
-				else {
+				} else {
 					future.setException(new KafkaProducerException(producerRecord, "Failed to send", exception));
 					if (KafkaTemplate.this.producerListener != null) {
 						KafkaTemplate.this.producerListener.onError(producerRecord, exception);
 					}
 					KafkaTemplate.this.logger.debug(exception, () -> "Failed to send: " + producerRecord);
 				}
-			}
-			finally {
+			} finally {
 				if (!KafkaTemplate.this.transactional) {
 					closeProducer(producer, false);
 				}
@@ -429,6 +428,7 @@ public class KafkaTemplate<K, V> implements KafkaOperations<K, V> {
 	/**
 	 * Return true if the template is currently running in a transaction on the
 	 * calling thread.
+	 *
 	 * @return true if a transaction is running.
 	 * @since 2.2.1
 	 */
@@ -447,8 +447,7 @@ public class KafkaTemplate<K, V> implements KafkaOperations<K, V> {
 			KafkaResourceHolder<K, V> holder = ProducerFactoryUtils
 					.getTransactionalResourceHolder(this.producerFactory, this.transactionIdPrefix);
 			return holder.getProducer();
-		}
-		else {
+		} else {
 			return this.producerFactory.createProducer(this.transactionIdPrefix);
 		}
 	}
